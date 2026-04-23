@@ -163,45 +163,38 @@
         }
         tickTodayCounter();
 
-        // 音频被抢占 → 记录打断开始
+        // 音频被抢占 → 立即停止计时
         audio.onpause = () => {
             if (!isRunning) return;
             if (!isInterrupted) {
                 isInterrupted = true;
                 interruptStartTime = Date.now();
+                isRunning = false; // 立即停止
+                
+                // 结束当前 session
+                endCurrentSession();
+                
                 statusTag.innerText = "检测到干扰";
                 statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400 animate-pulse";
                 sendNotification('⚠️ 检测到干扰', '你的专注被打断了，回来后点开始继续。');
+                
+                // 显示开始按钮
+                startBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
             }
         };
 
-        document.addEventListener('visibilitychange', () => {
-            if (!isRunning) return;
-            if (document.visibilityState === 'hidden') {
-                if (isInterrupted) {
-                    interruptedMs += Date.now() - interruptStartTime;
-                    isInterrupted = false;
-                }
-                lastActiveTime = Date.now();
-            } else {
-                if (isInterrupted) {
-                    isInterrupted = false;
-                    interruptedMs += Date.now() - interruptStartTime;
-                    isRunning = false;
-                    audio.pause();
-                    // 结束当前 session
-                    endCurrentSession();
-                    statusTag.innerText = "已暂停";
-                    statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400";
-                    startBtn.classList.remove('hidden');
-                    stopBtn.classList.add('hidden');
-                } else {
-                    lastActiveTime = Date.now();
-                    updateUI();
-                    audio.play().catch(() => {});
-                }
-            }
-        });
+        // document.addEventListener('visibilitychange', () => {
+        //     if (!isRunning) return;
+        //     if (document.visibilityState === 'hidden') {
+        //         lastActiveTime = Date.now();
+        //     } else {
+        //         // 回到页面：恢复播放，继续计时
+        //         lastActiveTime = Date.now();
+        //         updateUI();
+        //         audio.play().catch(() => {});
+        //     }
+        // });
 
         function startChallenge() {
             const isResume = sessionStartTime > 0 && !isRunning;
