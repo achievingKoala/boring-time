@@ -23,7 +23,7 @@
     <div class="fixed top-0 w-full p-6 flex justify-between items-center bg-zinc-900/50 backdrop-blur-md border-b border-zinc-800">
         <h1 class="font-bold text-xl tracking-tighter">SILENT<span class="text-green-500">STATS</span></h1>
         <div class="text-sm text-zinc-400 text-right">
-            历史总计: <span id="total-accumulated">0</span> 分钟
+            今日专注: <span id="total-accumulated">0</span>
         </div>
     </div>
 
@@ -44,6 +44,9 @@
         <div class="flex flex-col gap-4">
             <button id="start-btn" class="w-full py-4 bg-green-600 hover:bg-green-500 text-black font-bold rounded-xl transition-all transform active:scale-95 shadow-lg">
                 开始挑战 (START)
+            </button>
+            <button id="stop-btn" class="hidden w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-all">
+                结束专注
             </button>
         </div>
 
@@ -67,55 +70,45 @@
     <audio id="silent-audio" loop></audio>
 
     <script>
-        // 生成 440Hz 有声 WAV（测试用，改回静音把正弦波那行删掉即可）
-        function createAudioSrc(durationSeconds = 30) {
-            const sampleRate = 44100;
-            const numSamples = sampleRate * durationSeconds;
-            const buffer = new ArrayBuffer(44 + numSamples * 2);
-            const view = new DataView(buffer);
-            const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
-            writeStr(0, 'RIFF');
-            view.setUint32(4, 36 + numSamples * 2, true);
-            writeStr(8, 'WAVE');
-            writeStr(12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, 1, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 2, true);
-            view.setUint16(32, 2, true);
-            view.setUint16(34, 16, true);
-            writeStr(36, 'data');
-            view.setUint32(40, numSamples * 2, true);
-            for (let i = 0; i < numSamples; i++) {
-                const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.2 * 32767;
-                view.setInt16(44 + i * 2, sample, true);
-            }
-            const blob = new Blob([buffer], { type: 'audio/wav' });
-            return URL.createObjectURL(blob);
-        }
-
         const audio = document.getElementById('silent-audio');
-        audio.src = createAudioSrc(30);
+        audio.src = 'p1.mp3';
+
+        // 今日专注：每天清零
+        function getTodayKey() {
+            return 'silentStats_' + new Date().toISOString().slice(0, 10);
+        }
+        const todayKey = getTodayKey();
+        let todaySeconds = parseInt(localStorage.getItem(todayKey)) || 0;
 
         // 状态
         let isRunning = false;
-        let sessionStartTime = 0;       // 本次挑战开始时间戳
-        let lastActiveTime = 0;         // 上次页面可见时间戳
-        let interruptedMs = 0;          // 本次累计被打断毫秒数
-        let interruptStartTime = 0;     // 当前这次打断的开始时间戳
-        let isInterrupted = false;      // 当前是否处于打断状态
-        let lifetimeMinutes = parseFloat(localStorage.getItem('silentStats_total')) || 0;
+        let sessionStartTime = 0;
+        let lastActiveTime = 0;
+        let interruptedMs = 0;
+        let interruptStartTime = 0;
+        let isInterrupted = false;
 
         const timerDisplay = document.getElementById('main-timer');
         const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
         const statusTag = document.getElementById('status-tag');
         const totalDisplay = document.getElementById('total-accumulated');
         const resultArea = document.getElementById('result-area');
 
-        totalDisplay.innerText = Math.floor(lifetimeMinutes);
+        totalDisplay.innerText = formatSec(todaySeconds);
 
-        // 音频被抢占 → 记录打断开始，尝试抢回
+        // 每秒更新今日专注（只在无声时累加）
+        function tickTodayCounter() {
+            if (isRunning && !isInterrupted) {
+                todaySeconds += 1;
+                localStorage.setItem(todayKey, todaySeconds);
+                totalDisplay.innerText = formatSec(todaySeconds);
+            }
+            setTimeout(tickTodayCounter, 1000);
+        }
+        tickTodayCounter();
+
+        // 音频被抢占 → 记录打断开始
         audio.onpause = () => {
             if (!isRunning) return;
             if (!isInterrupted) {
@@ -123,9 +116,7 @@
                 interruptStartTime = Date.now();
                 statusTag.innerText = "检测到干扰";
                 statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400 animate-pulse";
-                console.log("Interrupted at", interruptStartTime);
             }
-
         };
 
         // 音频恢复播放 → 打断结束
@@ -136,18 +127,29 @@
                 interruptedMs += Date.now() - interruptStartTime;
                 statusTag.innerText = "静默探测中";
                 statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-green-500 animate-pulse";
-                console.log("Resumed, total interrupted:", interruptedMs, "ms");
             }
         };
 
-        // 回到页面 → 自动结算
+        // 回到页面：恢复播放，继续计时；不自动结算
+        // 用户需要再次离开页面才会触发下一次结算
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && isRunning) {
-                // 补算锁屏期间时间
-                const now = Date.now();
-                lastActiveTime = now;
+            if (!isRunning) return;
+            if (document.visibilityState === 'hidden') {
+                // 离开页面：如果当前被打断，记录打断时间并结算
+                if (isInterrupted) {
+                    interruptedMs += Date.now() - interruptStartTime;
+                    isInterrupted = false;
+                }
+                // 记录离开时间，用于锁屏补算
+                lastActiveTime = Date.now();
+            } else {
+                // 回到页面：补算锁屏时间，恢复播放，继续计时
+                const gap = Date.now() - lastActiveTime;
+                // 锁屏期间音频也可能被打断，无法区分，暂不计入打断
+                lastActiveTime = Date.now();
                 updateUI();
-                settle();
+                // 恢复播放（用户回到页面，浏览器允许 play()）
+                audio.play().catch(() => {});
             }
         });
 
@@ -162,6 +164,7 @@
             audio.play().catch(e => console.error("Audio play blocked", e));
 
             startBtn.classList.add('hidden');
+            stopBtn.classList.remove('hidden');
             resultArea.classList.add('hidden');
             statusTag.innerText = "静默探测中";
             statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-green-500 animate-pulse";
@@ -185,11 +188,7 @@
             const interruptSec = Math.floor(interruptedMs / 1000);
             const cleanSec = Math.max(0, totalSec - interruptSec);
 
-            // 只把纯净时间计入历史
-            lifetimeMinutes += cleanSec / 60;
-            localStorage.setItem('silentStats_total', lifetimeMinutes);
-            totalDisplay.innerText = Math.floor(lifetimeMinutes);
-
+            // 纯净时间已由 tickTodayCounter 实时写入，无需在此重复计入
             document.getElementById('result-total').innerText = formatSec(totalSec);
             document.getElementById('result-interrupted').innerText = formatSec(interruptSec);
             document.getElementById('result-clean').innerText = formatSec(cleanSec);
@@ -200,6 +199,7 @@
 
         function resetUI() {
             startBtn.classList.remove('hidden');
+            stopBtn.classList.add('hidden');
             statusTag.innerText = "等待开始";
             statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-zinc-500";
             timerDisplay.innerText = "00:00:00";
@@ -231,6 +231,7 @@
         }
 
         startBtn.onclick = startChallenge;
+        stopBtn.onclick = settle;
     </script>
 </body>
 </html>
