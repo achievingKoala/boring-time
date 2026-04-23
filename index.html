@@ -70,24 +70,16 @@
             <button id="start-btn" class="w-full py-4 bg-green-600 hover:bg-green-500 text-black font-bold rounded-xl transition-all transform active:scale-95 shadow-lg">
                 开始挑战 (START)
             </button>
-            <button id="stop-btn" class="hidden w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-all">
-                结束专注
+            <button id="pause-btn" class="hidden w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-all">
+                暂停专注
             </button>
         </div>
 
         <!-- 本次结算结果 -->
         <div id="result-area" class="hidden mt-4 p-6 border border-zinc-700 rounded-2xl bg-zinc-900/30 text-left space-y-4">
             <div>
-                <p class="text-xs text-zinc-500 mb-1">本次总时长</p>
+                <p class="text-xs text-zinc-500 mb-1">本次专注时长</p>
                 <p id="result-total" class="text-3xl font-bold text-green-400">0 秒</p>
-            </div>
-            <div>
-                <p class="text-xs text-zinc-500 mb-1">其中被打断时长</p>
-                <p id="result-interrupted" class="text-xl font-bold text-yellow-400">0 秒</p>
-            </div>
-            <div>
-                <p class="text-xs text-zinc-500 mb-1">纯净专注时长</p>
-                <p id="result-clean" class="text-xl font-bold text-green-300">0 秒</p>
             </div>
         </div>
 
@@ -127,14 +119,10 @@
         // 状态
         let isRunning = false;
         let sessionStartTime = 0;
-        let lastActiveTime = 0;
-        let interruptedMs = 0;
-        let interruptStartTime = 0;
-        let isInterrupted = false;
 
         const timerDisplay = document.getElementById('main-timer');
         const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
+        const pauseBtn = document.getElementById('pause-btn');
         const statusTag = document.getElementById('status-tag');
         const totalDisplay = document.getElementById('total-accumulated');
         const resultArea = document.getElementById('result-area');
@@ -152,61 +140,40 @@
             }
         }
 
-        // 每秒更新今日专注（只在无声时累加）
+        // 每秒更新今日专注（只在音频播放时累加）
         function tickTodayCounter() {
-            if (isRunning && !isInterrupted) {
+            if (isRunning) {
                 todaySeconds += 1;
                 localStorage.setItem(todayKey, todaySeconds);
                 totalDisplay.innerText = formatSec(todaySeconds);
             }
             setTimeout(tickTodayCounter, 1000);
         }
+        
         tickTodayCounter();
 
-        // 音频被抢占 → 立即停止计时
+        // 音频被暂停/打断 → 立即停止计时
         audio.onpause = () => {
             if (!isRunning) return;
-            if (!isInterrupted) {
-                isInterrupted = true;
-                interruptStartTime = Date.now();
-                isRunning = false; // 立即停止
-                
-                // 结束当前 session
-                endCurrentSession();
-                
-                statusTag.innerText = "检测到干扰";
-                statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400 animate-pulse";
-                sendNotification('⚠️ 检测到干扰', '你的专注被打断了，回来后点开始继续。');
-                
-                // 显示开始按钮
-                startBtn.classList.remove('hidden');
-                stopBtn.classList.add('hidden');
-            }
+            
+            isRunning = false; // 立即停止计时
+            
+            // 结束当前 session
+            endCurrentSession();
+            
+            statusTag.innerText = "检测到干扰";
+            statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400 animate-pulse";
+            sendNotification('⚠️ 检测到干扰', '你的专注被打断了，点击开始继续。');
+            
+            // 显示开始按钮
+            startBtn.classList.remove('hidden');
+            pauseBtn.classList.add('hidden');
         };
 
-        // document.addEventListener('visibilitychange', () => {
-        //     if (!isRunning) return;
-        //     if (document.visibilityState === 'hidden') {
-        //         lastActiveTime = Date.now();
-        //     } else {
-        //         // 回到页面：恢复播放，继续计时
-        //         lastActiveTime = Date.now();
-        //         updateUI();
-        //         audio.play().catch(() => {});
-        //     }
-        // });
-
         function startChallenge() {
-            const isResume = sessionStartTime > 0 && !isRunning;
             isRunning = true;
-            isInterrupted = false;
-            if (!isResume) {
-                interruptedMs = 0;
-                interruptStartTime = 0;
-                sessionStartTime = Date.now();
-                resultArea.classList.add('hidden');
-            }
-            lastActiveTime = Date.now();
+            sessionStartTime = Date.now();
+            resultArea.classList.add('hidden');
 
             // 新建一段 session 前，先关闭所有未结束的
             sessions.forEach(s => { if (s.end === null) s.end = Date.now(); });
@@ -217,7 +184,7 @@
             audio.play().catch(e => console.error("Audio play blocked", e));
 
             startBtn.classList.add('hidden');
-            stopBtn.classList.remove('hidden');
+            pauseBtn.classList.remove('hidden');
             statusTag.innerText = "静默探测中";
             statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-green-500 animate-pulse";
 
@@ -236,26 +203,17 @@
             renderTimeline();
         }
 
-        function settle() {
+        function pauseChallenge() {
             if (!isRunning) return;
             isRunning = false;
             audio.pause();
-
-            if (isInterrupted) {
-                interruptedMs += Date.now() - interruptStartTime;
-                isInterrupted = false;
-            }
 
             endCurrentSession();
 
             const totalMs = Date.now() - sessionStartTime;
             const totalSec = Math.floor(totalMs / 1000);
-            const interruptSec = Math.floor(interruptedMs / 1000);
-            const cleanSec = Math.max(0, totalSec - interruptSec);
 
             document.getElementById('result-total').innerText = formatSec(totalSec);
-            document.getElementById('result-interrupted').innerText = formatSec(interruptSec);
-            document.getElementById('result-clean').innerText = formatSec(cleanSec);
             resultArea.classList.remove('hidden');
 
             resetUI();
@@ -264,7 +222,7 @@
         function resetUI() {
             sessionStartTime = 0;
             startBtn.classList.remove('hidden');
-            stopBtn.classList.add('hidden');
+            pauseBtn.classList.add('hidden');
             statusTag.innerText = "等待开始";
             statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-zinc-500";
             timerDisplay.innerText = "00:00:00";
@@ -359,7 +317,7 @@
         renderTimeline();
 
         startBtn.onclick = startChallenge;
-        stopBtn.onclick = settle;
+        pauseBtn.onclick = pauseChallenge;
     </script>
 </body>
 </html>
