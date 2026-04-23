@@ -15,6 +15,31 @@
         .timer-glow {
             text-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
         }
+        /* 时间轴 24 小时格子 */
+        .timeline-bar {
+            position: relative;
+            height: 32px;
+            background: #1c1c1c;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .timeline-segment {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: #22c55e;
+            border-radius: 3px;
+            opacity: 0.85;
+        }
+        .timeline-segment.active {
+            background: #4ade80;
+            opacity: 1;
+            animation: pulse-bar 2s infinite;
+        }
+        @keyframes pulse-bar {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-4">
@@ -65,6 +90,22 @@
                 <p id="result-clean" class="text-xl font-bold text-green-300">0 秒</p>
             </div>
         </div>
+
+        <!-- 今日时间轴 -->
+        <div class="mt-4 p-6 border border-zinc-800 rounded-2xl bg-zinc-900/30 text-left">
+            <p class="text-xs text-zinc-500 mb-3 font-bold uppercase tracking-widest">今日时间轴</p>
+            <!-- 时间刻度 -->
+            <div class="flex justify-between text-[10px] text-zinc-600 mb-1 px-0">
+                <span>0</span>
+                <span>6</span>
+                <span>12</span>
+                <span>18</span>
+                <span>24</span>
+            </div>
+            <div class="timeline-bar" id="timeline-bar"></div>
+            <!-- 图例 -->
+            <div id="session-list" class="mt-4 space-y-1"></div>
+        </div>
     </main>
 
     <audio id="silent-audio" loop></audio>
@@ -78,7 +119,10 @@
             return 'silentStats_' + new Date().toISOString().slice(0, 10);
         }
         const todayKey = getTodayKey();
+        const sessionsKey = todayKey + '_sessions';
         let todaySeconds = parseInt(localStorage.getItem(todayKey)) || 0;
+        // sessions: [{start: timestamp, end: timestamp|null}]
+        let sessions = JSON.parse(localStorage.getItem(sessionsKey) || '[]');
 
         // 状态
         let isRunning = false;
@@ -131,25 +175,22 @@
             }
         };
 
-        // 回到页面：恢复播放，继续计时；不自动结算
-        // 用户需要再次离开页面才会触发下一次结算
         document.addEventListener('visibilitychange', () => {
             if (!isRunning) return;
             if (document.visibilityState === 'hidden') {
-                // 离开页面：如果当前被打断，记录打断时间并结算
                 if (isInterrupted) {
                     interruptedMs += Date.now() - interruptStartTime;
                     isInterrupted = false;
                 }
-                // 记录离开时间，用于锁屏补算
                 lastActiveTime = Date.now();
             } else {
-                // 回到页面：如果被打断过，暂停等用户手动点开始
                 if (isInterrupted) {
                     isInterrupted = false;
                     interruptedMs += Date.now() - interruptStartTime;
                     isRunning = false;
                     audio.pause();
+                    // 结束当前 session
+                    endCurrentSession();
                     statusTag.innerText = "已暂停";
                     statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400";
                     startBtn.classList.remove('hidden');
@@ -163,18 +204,22 @@
         });
 
         function startChallenge() {
-            // 如果是续接（sessionStartTime 已有值），不重置计时
             const isResume = sessionStartTime > 0 && !isRunning;
             isRunning = true;
             isInterrupted = false;
             if (!isResume) {
-                // 全新开始
                 interruptedMs = 0;
                 interruptStartTime = 0;
                 sessionStartTime = Date.now();
                 resultArea.classList.add('hidden');
             }
             lastActiveTime = Date.now();
+
+            // 新建一段 session 前，先关闭所有未结束的
+            sessions.forEach(s => { if (s.end === null) s.end = Date.now(); });
+            sessions.push({ start: Date.now(), end: null });
+            saveSessions();
+            renderTimeline();
 
             audio.play().catch(e => console.error("Audio play blocked", e));
 
@@ -186,23 +231,35 @@
             tick();
         }
 
+        function endCurrentSession() {
+            // 找最后一个未结束的 session 结束它
+            for (let i = sessions.length - 1; i >= 0; i--) {
+                if (sessions[i].end === null) {
+                    sessions[i].end = Date.now();
+                    break;
+                }
+            }
+            saveSessions();
+            renderTimeline();
+        }
+
         function settle() {
             if (!isRunning) return;
             isRunning = false;
             audio.pause();
 
-            // 如果结算时仍处于打断状态，把这段也算进去
             if (isInterrupted) {
                 interruptedMs += Date.now() - interruptStartTime;
                 isInterrupted = false;
             }
+
+            endCurrentSession();
 
             const totalMs = Date.now() - sessionStartTime;
             const totalSec = Math.floor(totalMs / 1000);
             const interruptSec = Math.floor(interruptedMs / 1000);
             const cleanSec = Math.max(0, totalSec - interruptSec);
 
-            // 纯净时间已由 tickTodayCounter 实时写入，无需在此重复计入
             document.getElementById('result-total').innerText = formatSec(totalSec);
             document.getElementById('result-interrupted').innerText = formatSec(interruptSec);
             document.getElementById('result-clean').innerText = formatSec(cleanSec);
@@ -226,12 +283,72 @@
             const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
             const s = (elapsed % 60).toString().padStart(2, '0');
             timerDisplay.innerText = `${h}:${m}:${s}`;
+            // 实时更新最后一段 session 的宽度
+            renderTimeline();
         }
 
         function tick() {
             if (!isRunning) return;
             updateUI();
             setTimeout(tick, 1000);
+        }
+
+        function saveSessions() {
+            localStorage.setItem(sessionsKey, JSON.stringify(sessions));
+        }
+
+        // 渲染时间轴
+        function renderTimeline() {
+            const bar = document.getElementById('timeline-bar');
+            const list = document.getElementById('session-list');
+            const dayStart = new Date();
+            dayStart.setHours(0, 0, 0, 0);
+            const dayMs = 24 * 60 * 60 * 1000;
+
+            bar.innerHTML = '';
+            list.innerHTML = '';
+
+            sessions.forEach((s, i) => {
+                const start = s.start;
+                const end = s.end || Date.now();
+
+                const leftPct = ((start - dayStart.getTime()) / dayMs) * 100;
+                const widthPct = ((end - start) / dayMs) * 100;
+
+                const seg = document.createElement('div');
+                seg.className = 'timeline-segment' + (s.end === null ? ' active' : '');
+                seg.style.left = leftPct + '%';
+                seg.style.width = Math.max(widthPct, 0.3) + '%';
+                seg.title = formatTime(start) + ' – ' + (s.end ? formatTime(end) : '进行中');
+                bar.appendChild(seg);
+
+                // 列表
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-2 text-xs text-zinc-400';
+
+                const dot = document.createElement('span');
+                dot.className = `w-2 h-2 rounded-full flex-shrink-0 ${s.end === null ? 'bg-green-400 animate-pulse' : 'bg-green-600'}`;
+
+                const timeSpan = document.createElement('span');
+                const endLabel = s.end ? formatTime(end) : '进行中';
+                timeSpan.textContent = `${formatTime(start)} → ${endLabel}`;
+                if (!s.end) timeSpan.querySelector && (timeSpan.style.color = '');
+
+                const durSpan = document.createElement('span');
+                durSpan.className = 'text-zinc-600 ml-auto';
+                durSpan.textContent = formatSec(Math.floor((end - start) / 1000));
+
+                item.appendChild(dot);
+                item.appendChild(timeSpan);
+                item.appendChild(durSpan);
+                list.appendChild(item);
+            });
+        }
+
+        function formatTime(ts) {
+            const d = new Date(ts);
+            return d.getHours().toString().padStart(2, '0') + ':' +
+                   d.getMinutes().toString().padStart(2, '0');
         }
 
         function formatSec(sec) {
@@ -244,6 +361,9 @@
             str += `${s} 秒`;
             return str;
         }
+
+        // 初始渲染
+        renderTimeline();
 
         startBtn.onclick = startChallenge;
         stopBtn.onclick = settle;
