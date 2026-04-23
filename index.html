@@ -129,16 +129,7 @@
 
         totalDisplay.innerText = formatSec(todaySeconds);
 
-        // 申请通知权限
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
 
-        function sendNotification(title, body) {
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(title, { body, icon: '' });
-            }
-        }
 
         // 每秒更新今日专注（只在音频播放时累加）
         function tickTodayCounter() {
@@ -163,7 +154,6 @@
             
             statusTag.innerText = "检测到干扰";
             statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400 animate-pulse";
-            sendNotification('⚠️ 检测到干扰', '你的专注被打断了，点击开始继续。');
             
             // 显示开始按钮
             startBtn.classList.remove('hidden');
