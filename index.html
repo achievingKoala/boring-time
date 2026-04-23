@@ -97,6 +97,17 @@
 
         totalDisplay.innerText = formatSec(todaySeconds);
 
+        // 申请通知权限
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+        function sendNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, { body, icon: '' });
+            }
+        }
+
         // 每秒更新今日专注（只在无声时累加）
         function tickTodayCounter() {
             if (isRunning && !isInterrupted) {
@@ -116,17 +127,7 @@
                 interruptStartTime = Date.now();
                 statusTag.innerText = "检测到干扰";
                 statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400 animate-pulse";
-            }
-        };
-
-        // 音频恢复播放 → 打断结束
-        audio.onplay = () => {
-            if (!isRunning) return;
-            if (isInterrupted) {
-                isInterrupted = false;
-                interruptedMs += Date.now() - interruptStartTime;
-                statusTag.innerText = "静默探测中";
-                statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-green-500 animate-pulse";
+                sendNotification('⚠️ 检测到干扰', '你的专注被打断了，回来后点开始继续。');
             }
         };
 
@@ -143,29 +144,42 @@
                 // 记录离开时间，用于锁屏补算
                 lastActiveTime = Date.now();
             } else {
-                // 回到页面：补算锁屏时间，恢复播放，继续计时
-                const gap = Date.now() - lastActiveTime;
-                // 锁屏期间音频也可能被打断，无法区分，暂不计入打断
-                lastActiveTime = Date.now();
-                updateUI();
-                // 恢复播放（用户回到页面，浏览器允许 play()）
-                audio.play().catch(() => {});
+                // 回到页面：如果被打断过，暂停等用户手动点开始
+                if (isInterrupted) {
+                    isInterrupted = false;
+                    interruptedMs += Date.now() - interruptStartTime;
+                    isRunning = false;
+                    audio.pause();
+                    statusTag.innerText = "已暂停";
+                    statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400";
+                    startBtn.classList.remove('hidden');
+                    stopBtn.classList.add('hidden');
+                } else {
+                    lastActiveTime = Date.now();
+                    updateUI();
+                    audio.play().catch(() => {});
+                }
             }
         });
 
         function startChallenge() {
+            // 如果是续接（sessionStartTime 已有值），不重置计时
+            const isResume = sessionStartTime > 0 && !isRunning;
             isRunning = true;
             isInterrupted = false;
-            interruptedMs = 0;
-            interruptStartTime = 0;
-            sessionStartTime = Date.now();
-            lastActiveTime = sessionStartTime;
+            if (!isResume) {
+                // 全新开始
+                interruptedMs = 0;
+                interruptStartTime = 0;
+                sessionStartTime = Date.now();
+                resultArea.classList.add('hidden');
+            }
+            lastActiveTime = Date.now();
 
             audio.play().catch(e => console.error("Audio play blocked", e));
 
             startBtn.classList.add('hidden');
             stopBtn.classList.remove('hidden');
-            resultArea.classList.add('hidden');
             statusTag.innerText = "静默探测中";
             statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-green-500 animate-pulse";
 
@@ -198,6 +212,7 @@
         }
 
         function resetUI() {
+            sessionStartTime = 0;
             startBtn.classList.remove('hidden');
             stopBtn.classList.add('hidden');
             statusTag.innerText = "等待开始";
