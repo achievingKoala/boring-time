@@ -108,13 +108,47 @@
 
         // 今日专注：每天清零
         function getTodayKey() {
-            return 'silentStats_' + new Date().toISOString().slice(0, 10);
+            const d = new Date();
+            return 'silentStats_' + d.getFullYear() + '-' +
+                String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                String(d.getDate()).padStart(2, '0');
         }
-        const todayKey = getTodayKey();
-        const sessionsKey = todayKey + '_sessions';
+        let todayKey = getTodayKey();
+        let sessionsKey = todayKey + '_sessions';
         let todaySeconds = parseInt(localStorage.getItem(todayKey)) || 0;
         // sessions: [{start: timestamp, end: timestamp|null}]
         let sessions = JSON.parse(localStorage.getItem(sessionsKey) || '[]');
+
+        // 获取今天 0 点的时间戳
+        function getTodayStartTs() {
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            return d.getTime();
+        }
+
+        // 跨日检测：如果日期变了，重置所有状态
+        function checkDayRollover() {
+            const newKey = getTodayKey();
+            if (newKey !== todayKey) {
+                // 结束昨天未关闭的 session（截止到昨天 23:59:59.999）
+                const todayStart = getTodayStartTs();
+                sessions.forEach(s => {
+                    if (s.end === null) s.end = todayStart - 1;
+                });
+                saveSessions();
+
+                // 切换到新的一天
+                todayKey = newKey;
+                sessionsKey = todayKey + '_sessions';
+                todaySeconds = 0;
+                sessions = [];
+                localStorage.setItem(todayKey, 0);
+                saveSessions();
+
+                totalDisplay.innerText = formatSec(0);
+                renderTimeline();
+            }
+        }
 
         // 状态
         let isRunning = false;
@@ -133,6 +167,7 @@
 
         // 每秒更新今日专注（只在音频播放时累加）
         function tickTodayCounter() {
+            checkDayRollover();
             if (isRunning) {
                 todaySeconds += 1;
                 localStorage.setItem(todayKey, todaySeconds);
@@ -244,16 +279,22 @@
             const list = document.getElementById('session-list');
             const dayStart = new Date();
             dayStart.setHours(0, 0, 0, 0);
+            const dayStartTs = dayStart.getTime();
             const dayMs = 24 * 60 * 60 * 1000;
+            const dayEndTs = dayStartTs + dayMs;
 
             bar.innerHTML = '';
             list.innerHTML = '';
 
             sessions.forEach((s, i) => {
-                const start = s.start;
-                const end = s.end || Date.now();
+                // 裁剪到今天范围内
+                const start = Math.max(s.start, dayStartTs);
+                const end = Math.min(s.end || Date.now(), dayEndTs);
 
-                const leftPct = ((start - dayStart.getTime()) / dayMs) * 100;
+                // 如果 session 完全不在今天范围内，跳过
+                if (end <= dayStartTs || start >= dayEndTs) return;
+
+                const leftPct = ((start - dayStartTs) / dayMs) * 100;
                 const widthPct = ((end - start) / dayMs) * 100;
 
                 const seg = document.createElement('div');
