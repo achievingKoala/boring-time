@@ -13,7 +13,6 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* 计时器使用等宽字体，毫秒跳动时数字位置固定，不抖动 */
         .timer-font {
             font-family: 'JetBrains Mono', monospace;
         }
@@ -25,7 +24,6 @@
             text-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
         }
 
-        /* 从右到左流动的呼吸渐变动画 */
         @keyframes shine-reverse {
             0% { background-position: 200% center; }
             100% { background-position: -200% center; }
@@ -49,6 +47,11 @@
             opacity: 0.7;
             border-radius: 2px;
         }
+
+        /* 移除 transition，防止满一分钟时产生回退动画 */
+        #micro-progress {
+            transition: none; 
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col items-center p-6">
@@ -67,14 +70,14 @@
                 准备就绪
             </div>
 
-            <!-- 独立进度条：从右向左的光影流向 -->
+            <!-- 独立进度条 -->
             <div id="progress-wrapper" class="w-full px-4 mb-8 opacity-0 transition-opacity duration-500">
                 <div class="h-4 w-full bg-gray-100 rounded-full p-1 border border-gray-50 shadow-inner overflow-hidden">
-                    <div id="micro-progress" class="h-full w-0 rounded-full transition-all progress-shimmer"></div>
+                    <div id="micro-progress" class="h-full w-0 rounded-full progress-shimmer"></div>
                 </div>
             </div>
 
-            <!-- 毫秒计时器：主数字大气，毫秒细致 -->
+            <!-- 毫秒计时器 -->
             <div id="timer-display" class="text-5xl font-bold mb-10 tabular-nums tracking-tighter timer-font timer-glow">
                 00:00:00<span class="text-2xl text-gray-300">.000</span>
             </div>
@@ -101,7 +104,6 @@
                 </div>
             </div>
 
-            <!-- 可视化时间轴 -->
             <div class="relative w-full h-4 bg-gray-100 rounded-full overflow-hidden mb-2" id="timeline-container"></div>
             <div class="flex justify-between text-[10px] text-gray-400 px-1 mb-6">
                 <span>00:00</span>
@@ -126,7 +128,7 @@
         </footer>
     </div>
 
-    <!-- 核心音频：占领音频焦点 -->
+    <!-- 核心音频 -->
     <audio id="white-noise" loop preload="auto">
         <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/p1.mp3" type="audio/mpeg">
     </audio>
@@ -165,16 +167,16 @@
             return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         }
 
-        // 使用 requestAnimationFrame 保证毫秒显示的流畅度
         function updateLoop() {
             if (!state.isFocusing) return;
             
             state.currentSessionMs = Date.now() - state.startTime;
             timerDisplay.innerHTML = formatTimeDetailed(state.currentSessionMs);
             
-            // 进度条：每60秒一循环，视觉上暗示“每一分钟都是新的开始”
+            // 进度条计算
             const progress = ((state.currentSessionMs % 60000) / 60000) * 100;
-            microProgress.style.width = `${progress || 1}%`;
+            // 直接赋值宽度，不经过 CSS transition，从而实现无感 reset
+            microProgress.style.width = `${progress}%`;
 
             if (state.currentSessionMs < 5000) {
                 hintText.textContent = "保持绝对静止，深度进入...";
@@ -233,7 +235,7 @@
             if (wasInterrupted) {
                 statusTag.textContent = "⚠️ 检测到干扰！";
                 statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-600 mb-6 uppercase tracking-widest";
-                hintText.textContent = "噪音入侵，专注已强制停止";
+                hintText.textContent = "声音被抢占，专注已强制停止";
             } else {
                 statusTag.textContent = "专注已保存";
                 statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 mb-6 uppercase tracking-widest";
@@ -244,7 +246,6 @@
             mainBtn.className = "w-full py-5 rounded-2xl bg-black text-white font-bold text-xl shadow-lg active:scale-95 transition-transform";
         }
 
-        // 核心：监听音频暂停（被其他App抢占焦点）
         audio.onpause = () => { if (state.isFocusing) stopFocus(true); };
 
         function renderStats() {
