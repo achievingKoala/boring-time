@@ -3,352 +3,300 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SilentStats - 专注力监控器</title>
+    <title>Silent Time | 远离干扰的纯净时间</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@700&display=swap');
+        
         body {
-            font-family: 'JetBrains+Mono', monospace;
-            background-color: #0a0a0a;
-            color: #e5e5e5;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
+
+        .timer-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
         .timer-glow {
-            text-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+            transition: all 0.3s ease;
         }
-        /* 时间轴 24 小时格子 */
-        .timeline-bar {
-            position: relative;
-            height: 32px;
-            background: #1c1c1c;
-            border-radius: 6px;
-            overflow: hidden;
+        .is-focusing .timer-glow {
+            text-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
         }
-        .timeline-segment {
+
+        @keyframes shine-reverse {
+            0% { background-position: 200% center; }
+            100% { background-position: -200% center; }
+        }
+
+        .progress-shimmer {
+            background: linear-gradient(
+                -90deg, 
+                #3b82f6 0%, 
+                #93c5fd 50%, 
+                #3b82f6 100%
+            );
+            background-size: 200% auto;
+            animation: shine-reverse 2.5s linear infinite;
+        }
+
+        .timeline-block {
             position: absolute;
-            top: 0;
             height: 100%;
-            background: #22c55e;
-            border-radius: 3px;
-            opacity: 0.85;
+            background: #3b82f6;
+            opacity: 0.7;
+            border-radius: 2px;
         }
-        .timeline-segment.active {
-            background: #4ade80;
-            opacity: 1;
-            animation: pulse-bar 2s infinite;
-        }
-        @keyframes pulse-bar {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+
+        /* 移除 transition，防止满一分钟时产生回退动画 */
+        #micro-progress {
+            transition: none; 
         }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col items-center p-6">
 
-    <!-- 顶部状态栏 -->
-    <div class="fixed top-0 w-full p-6 flex justify-between items-center bg-zinc-900/50 backdrop-blur-md border-b border-zinc-800">
-        <h1 class="font-bold text-xl tracking-tighter">SILENT<span class="text-green-500">STATS</span></h1>
-        <div class="text-sm text-zinc-400 text-right">
-            今日专注: <span id="total-accumulated">0</span>
-        </div>
+    <div class="w-full max-w-md flex-1 flex flex-col">
+        <!-- Header -->
+        <header class="text-center mt-8 mb-10">
+            <h1 class="text-3xl font-extrabold tracking-tight mb-2">Silent Time</h1>
+            <p class="text-gray-500 text-sm">记录你远离手机噪音的每一毫秒</p>
+        </header>
+
+        <!-- Main Timer Card -->
+        <main class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 mb-8 text-center border border-gray-100 flex-1 flex flex-col justify-center relative">
+            
+            <div id="status-tag" class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 mb-6 uppercase tracking-widest transition-all">
+                准备就绪
+            </div>
+
+            <!-- 独立进度条 -->
+            <div id="progress-wrapper" class="w-full px-4 mb-8 opacity-0 transition-opacity duration-500">
+                <div class="h-4 w-full bg-gray-100 rounded-full p-1 border border-gray-50 shadow-inner overflow-hidden">
+                    <div id="micro-progress" class="h-full w-0 rounded-full progress-shimmer"></div>
+                </div>
+            </div>
+
+            <!-- 毫秒计时器 -->
+            <div id="timer-display" class="text-5xl font-bold mb-10 tabular-nums tracking-tighter timer-font timer-glow">
+                00:00:00<span class="text-2xl text-gray-300">.000</span>
+            </div>
+
+            <div class="space-y-4">
+                <button id="main-btn" class="w-full py-5 rounded-2xl bg-black text-white font-bold text-xl shadow-lg active:scale-95 transition-transform">
+                    开始专注
+                </button>
+                <p id="hint-text" class="text-xs text-gray-400 h-4">
+                    点击后将播放静音白噪音以感知干扰
+                </p>
+            </div>
+        </main>
+
+        <!-- Stats Section -->
+        <section class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
+            <div class="flex justify-between items-end mb-4">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-tighter text-[10px]">今日累计</h3>
+                    <div id="total-time" class="text-2xl font-bold">0 分钟</div>
+                </div>
+                <div class="text-right">
+                    <button id="share-btn" class="text-blue-500 text-xs font-semibold">分享成就 ↗</button>
+                </div>
+            </div>
+
+            <div class="relative w-full h-4 bg-gray-100 rounded-full overflow-hidden mb-2" id="timeline-container"></div>
+            <div class="flex justify-between text-[10px] text-gray-400 px-1 mb-6">
+                <span>00:00</span>
+                <span>12:00</span>
+                <span>24:00</span>
+            </div>
+
+            <!-- 历史列表 -->
+            <div class="space-y-3">
+                <h4 class="text-[10px] font-bold text-gray-300 uppercase tracking-widest">专注历史</h4>
+                <div id="session-list" class="max-h-48 overflow-y-auto space-y-2 pr-1">
+                    <p class="text-xs text-gray-400 text-center py-4">今天还没有记录</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="text-center pb-8 mt-auto">
+            <p class="text-[10px] text-gray-300 uppercase tracking-widest font-medium">
+                Pure Static • Precision Mode • Levelsio Style
+            </p>
+        </footer>
     </div>
 
-    <!-- 主交互区 -->
-    <main class="w-full max-w-md text-center space-y-8">
-
-        <div id="status-tag" class="inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-zinc-500">
-            等待开始
-        </div>
-
-        <!-- 计时器 -->
-        <div class="py-12">
-            <div id="main-timer" class="text-7xl font-bold timer-glow transition-all duration-500">00:00:00</div>
-            <p class="text-zinc-500 mt-4 text-sm px-8">点击开始后，请锁屏或切换到其他 App。回到页面后自动结算。</p>
-        </div>
-
-        <!-- 操作按钮 -->
-        <div class="flex flex-col gap-4">
-            <button id="start-btn" class="w-full py-4 bg-green-600 hover:bg-green-500 text-black font-bold rounded-xl transition-all transform active:scale-95 shadow-lg">
-                开始挑战 (START)
-            </button>
-            <button id="pause-btn" class="hidden w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-all">
-                暂停专注
-            </button>
-        </div>
-
-        <!-- 本次结算结果 -->
-        <div id="result-area" class="hidden mt-4 p-6 border border-zinc-700 rounded-2xl bg-zinc-900/30 text-left space-y-4">
-            <div>
-                <p class="text-xs text-zinc-500 mb-1">本次专注时长</p>
-                <p id="result-total" class="text-3xl font-bold text-green-400">0 秒</p>
-            </div>
-        </div>
-
-        <!-- 今日时间轴 -->
-        <div class="mt-4 p-6 border border-zinc-800 rounded-2xl bg-zinc-900/30 text-left">
-            <p class="text-xs text-zinc-500 mb-3 font-bold uppercase tracking-widest">今日时间轴</p>
-            <!-- 时间刻度 -->
-            <div class="flex justify-between text-[10px] text-zinc-600 mb-1 px-0">
-                <span>0</span>
-                <span>6</span>
-                <span>12</span>
-                <span>18</span>
-                <span>24</span>
-            </div>
-            <div class="timeline-bar" id="timeline-bar"></div>
-            <!-- 图例 -->
-            <div id="session-list" class="mt-4 space-y-1"></div>
-        </div>
-    </main>
-
-    <audio id="silent-audio" loop></audio>
+    <!-- 核心音频 -->
+    <audio id="white-noise" loop preload="auto">
+        <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/p1.mp3" type="audio/mpeg">
+    </audio>
 
     <script>
-        const audio = document.getElementById('silent-audio');
-        audio.src = 'https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/p1.mp3';
-
-        // 今日专注：每天清零
-        function getTodayKey() {
-            const d = new Date();
-            return 'silentStats_' + d.getFullYear() + '-' +
-                String(d.getMonth() + 1).padStart(2, '0') + '-' +
-                String(d.getDate()).padStart(2, '0');
-        }
-        let todayKey = getTodayKey();
-        let sessionsKey = todayKey + '_sessions';
-        let todaySeconds = parseInt(localStorage.getItem(todayKey)) || 0;
-        // sessions: [{start: timestamp, end: timestamp|null}]
-        let sessions = JSON.parse(localStorage.getItem(sessionsKey) || '[]');
-
-        // 获取今天 0 点的时间戳
-        function getTodayStartTs() {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            return d.getTime();
-        }
-
-        // 跨日检测：如果日期变了，重置所有状态
-        function checkDayRollover() {
-            const newKey = getTodayKey();
-            if (newKey !== todayKey) {
-                // 结束昨天未关闭的 session（截止到昨天 23:59:59.999）
-                const todayStart = getTodayStartTs();
-                sessions.forEach(s => {
-                    if (s.end === null) s.end = todayStart - 1;
-                });
-                saveSessions();
-
-                // 切换到新的一天
-                todayKey = newKey;
-                sessionsKey = todayKey + '_sessions';
-                todaySeconds = 0;
-                sessions = [];
-                localStorage.setItem(todayKey, 0);
-                saveSessions();
-
-                totalDisplay.innerText = formatSec(0);
-                renderTimeline();
-            }
-        }
-
-        // 状态
-        let isRunning = false;
-        let sessionStartTime = 0;
-
-        const timerDisplay = document.getElementById('main-timer');
-        const startBtn = document.getElementById('start-btn');
-        const pauseBtn = document.getElementById('pause-btn');
-        const statusTag = document.getElementById('status-tag');
-        const totalDisplay = document.getElementById('total-accumulated');
-        const resultArea = document.getElementById('result-area');
-
-        totalDisplay.innerText = formatSec(todaySeconds);
-
-
-
-        // 每秒更新今日专注（只在音频播放时累加）
-        function tickTodayCounter() {
-            checkDayRollover();
-            if (isRunning) {
-                todaySeconds += 1;
-                localStorage.setItem(todayKey, todaySeconds);
-                totalDisplay.innerText = formatSec(todaySeconds);
-            }
-            setTimeout(tickTodayCounter, 1000);
-        }
-        
-        tickTodayCounter();
-
-        // 音频被暂停/打断 → 立即停止计时
-        audio.onpause = () => {
-            if (!isRunning) return;
-            
-            isRunning = false; // 立即停止计时
-            
-            // 结束当前 session
-            endCurrentSession();
-            
-            statusTag.innerText = "检测到干扰";
-            statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-yellow-400 animate-pulse";
-            
-            // 显示开始按钮
-            startBtn.classList.remove('hidden');
-            pauseBtn.classList.add('hidden');
+        const state = {
+            isFocusing: false,
+            startTime: null,
+            currentSessionMs: 0,
+            sessions: JSON.parse(localStorage.getItem('silent_sessions') || '[]'),
+            timerRequest: null
         };
 
-        function startChallenge() {
-            isRunning = true;
-            sessionStartTime = Date.now();
-            resultArea.classList.add('hidden');
+        const audio = document.getElementById('white-noise');
+        const mainBtn = document.getElementById('main-btn');
+        const timerDisplay = document.getElementById('timer-display');
+        const statusTag = document.getElementById('status-tag');
+        const totalDisplay = document.getElementById('total-time');
+        const hintText = document.getElementById('hint-text');
+        const timelineContainer = document.getElementById('timeline-container');
+        const sessionList = document.getElementById('session-list');
+        const microProgress = document.getElementById('micro-progress');
+        const progressWrapper = document.getElementById('progress-wrapper');
 
-            // 新建一段 session 前，先关闭所有未结束的
-            sessions.forEach(s => { if (s.end === null) s.end = Date.now(); });
-            sessions.push({ start: Date.now(), end: null });
-            saveSessions();
-            renderTimeline();
-
-            audio.play().catch(e => console.error("Audio play blocked", e));
-
-            startBtn.classList.add('hidden');
-            pauseBtn.classList.remove('hidden');
-            statusTag.innerText = "静默探测中";
-            statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-green-500 animate-pulse";
-
-            tick();
+        function formatTimeDetailed(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+            const s = (totalSeconds % 60).toString().padStart(2, '0');
+            const milliseconds = (ms % 1000).toString().padStart(3, '0');
+            return `${h}:${m}:${s}<span class="text-2xl text-blue-500 opacity-60">.${milliseconds}</span>`;
         }
 
-        function endCurrentSession() {
-            // 找最后一个未结束的 session 结束它
-            for (let i = sessions.length - 1; i >= 0; i--) {
-                if (sessions[i].end === null) {
-                    sessions[i].end = Date.now();
-                    break;
-                }
+        function formatClock(timestamp) {
+            const d = new Date(timestamp);
+            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function updateLoop() {
+            if (!state.isFocusing) return;
+            
+            state.currentSessionMs = Date.now() - state.startTime;
+            timerDisplay.innerHTML = formatTimeDetailed(state.currentSessionMs);
+            
+            // 进度条计算
+            const progress = ((state.currentSessionMs % 60000) / 60000) * 100;
+            // 直接赋值宽度，不经过 CSS transition，从而实现无感 reset
+            microProgress.style.width = `${progress}%`;
+
+            if (state.currentSessionMs < 5000) {
+                hintText.textContent = "保持绝对静止，深度进入...";
+            } else {
+                const totalMins = Math.floor(state.currentSessionMs / 60000);
+                hintText.textContent = totalMins > 0 ? `已守护纯净专注 ${totalMins} 分钟` : "这是你应得的宁静";
             }
-            saveSessions();
-            renderTimeline();
+
+            state.timerRequest = requestAnimationFrame(updateLoop);
         }
 
-        function pauseChallenge() {
-            if (!isRunning) return;
-            isRunning = false;
+        function saveSession() {
+            if (state.currentSessionMs > 1000) {
+                state.sessions.push({
+                    start: state.startTime,
+                    end: Date.now(),
+                    duration: Math.floor(state.currentSessionMs / 1000)
+                });
+                localStorage.setItem('silent_sessions', JSON.stringify(state.sessions));
+                renderStats();
+            }
+        }
+
+        function startFocus() {
+            state.isFocusing = true;
+            state.startTime = Date.now();
+            state.currentSessionMs = 0;
+            
+            audio.play().catch(() => stopFocus(false));
+
+            document.body.classList.add('is-focusing');
+            progressWrapper.classList.replace('opacity-0', 'opacity-100');
+            
+            statusTag.textContent = "深度专注中";
+            statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-blue-500 text-white mb-6 uppercase tracking-widest shadow-md";
+            
+            mainBtn.textContent = "结束本次专注";
+            mainBtn.className = "w-full py-5 rounded-2xl bg-gray-100 text-gray-400 font-bold text-xl active:scale-95 transition-transform";
+
+            state.timerRequest = requestAnimationFrame(updateLoop);
+        }
+
+        function stopFocus(wasInterrupted = false) {
+            cancelAnimationFrame(state.timerRequest);
+            saveSession();
+
+            state.isFocusing = false;
             audio.pause();
+            audio.currentTime = 0;
+            
+            progressWrapper.classList.replace('opacity-100', 'opacity-0');
+            microProgress.style.width = '0';
 
-            endCurrentSession();
+            document.body.classList.remove('is-focusing');
+            
+            if (wasInterrupted) {
+                statusTag.textContent = "检测到干扰！";
+                statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-600 mb-6 uppercase tracking-widest";
+                hintText.textContent = "声音被抢占，专注已强制停止";
+            } else {
+                statusTag.textContent = "专注已保存";
+                statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 mb-6 uppercase tracking-widest";
+                hintText.textContent = "准备好开始下一段纯净时间了吗？";
+            }
 
-            const totalMs = Date.now() - sessionStartTime;
-            const totalSec = Math.floor(totalMs / 1000);
-
-            document.getElementById('result-total').innerText = formatSec(totalSec);
-            resultArea.classList.remove('hidden');
-
-            resetUI();
+            mainBtn.textContent = "再次开始";
+            mainBtn.className = "w-full py-5 rounded-2xl bg-black text-white font-bold text-xl shadow-lg active:scale-95 transition-transform";
         }
 
-        function resetUI() {
-            sessionStartTime = 0;
-            startBtn.classList.remove('hidden');
-            pauseBtn.classList.add('hidden');
-            statusTag.innerText = "等待开始";
-            statusTag.className = "inline-block px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold uppercase tracking-widest text-zinc-500";
-            timerDisplay.innerText = "00:00:00";
-        }
+        audio.onpause = () => { if (state.isFocusing) stopFocus(true); };
 
-        function updateUI() {
-            const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
-            const h = Math.floor(elapsed / 3600).toString().padStart(2, '0');
-            const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
-            const s = (elapsed % 60).toString().padStart(2, '0');
-            timerDisplay.innerText = `${h}:${m}:${s}`;
-            // 实时更新最后一段 session 的宽度
-            renderTimeline();
-        }
+        function renderStats() {
+            const today = new Date().toDateString();
+            const todaySessions = state.sessions
+                .filter(s => new Date(s.start).toDateString() === today)
+                .sort((a, b) => b.start - a.start);
+            
+            const totalSeconds = todaySessions.reduce((acc, s) => acc + s.duration, 0);
+            totalDisplay.textContent = `${Math.floor(totalSeconds / 60)} 分钟`;
 
-        function tick() {
-            if (!isRunning) return;
-            updateUI();
-            setTimeout(tick, 1000);
-        }
-
-        function saveSessions() {
-            localStorage.setItem(sessionsKey, JSON.stringify(sessions));
-        }
-
-        // 渲染时间轴
-        function renderTimeline() {
-            const bar = document.getElementById('timeline-bar');
-            const list = document.getElementById('session-list');
-            const dayStart = new Date();
-            dayStart.setHours(0, 0, 0, 0);
-            const dayStartTs = dayStart.getTime();
-            const dayMs = 24 * 60 * 60 * 1000;
-            const dayEndTs = dayStartTs + dayMs;
-
-            bar.innerHTML = '';
-            list.innerHTML = '';
-
-            sessions.forEach((s, i) => {
-                // 裁剪到今天范围内
-                const start = Math.max(s.start, dayStartTs);
-                const end = Math.min(s.end || Date.now(), dayEndTs);
-
-                // 如果 session 完全不在今天范围内，跳过
-                if (end <= dayStartTs || start >= dayEndTs) return;
-
-                const leftPct = ((start - dayStartTs) / dayMs) * 100;
-                const widthPct = ((end - start) / dayMs) * 100;
-
-                const seg = document.createElement('div');
-                seg.className = 'timeline-segment' + (s.end === null ? ' active' : '');
-                seg.style.left = leftPct + '%';
-                seg.style.width = Math.max(widthPct, 0.3) + '%';
-                seg.title = formatTime(start) + ' – ' + (s.end ? formatTime(end) : '进行中');
-                bar.appendChild(seg);
-
-                // 列表
-                const item = document.createElement('div');
-                item.className = 'flex items-center gap-2 text-xs text-zinc-400';
-
-                const dot = document.createElement('span');
-                dot.className = `w-2 h-2 rounded-full flex-shrink-0 ${s.end === null ? 'bg-green-400 animate-pulse' : 'bg-green-600'}`;
-
-                const timeSpan = document.createElement('span');
-                const endLabel = s.end ? formatTime(end) : '进行中';
-                timeSpan.textContent = `${formatTime(start)} → ${endLabel}`;
-                if (!s.end) timeSpan.querySelector && (timeSpan.style.color = '');
-
-                const durSpan = document.createElement('span');
-                durSpan.className = 'text-zinc-600 ml-auto';
-                durSpan.textContent = formatSec(Math.floor((end - start) / 1000));
-
-                item.appendChild(dot);
-                item.appendChild(timeSpan);
-                item.appendChild(durSpan);
-                list.appendChild(item);
+            timelineContainer.innerHTML = '';
+            todaySessions.forEach(s => {
+                const dayStart = new Date(s.start).setHours(0,0,0,0);
+                const startPos = ((s.start - dayStart) / (24 * 3600 * 1000)) * 100;
+                const width = (s.duration / (24 * 3600)) * 100;
+                const block = document.createElement('div');
+                block.className = 'timeline-block';
+                block.style.left = `${startPos}%`;
+                block.style.width = `${Math.max(width, 0.5)}%`;
+                timelineContainer.appendChild(block);
             });
+
+            if (todaySessions.length === 0) {
+                sessionList.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">今天还没有记录</p>';
+            } else {
+                sessionList.innerHTML = todaySessions.map(s => `
+                    <div class="flex justify-between items-center bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm text-gray-400">—</span>
+                            <div>
+                                <p class="text-[9px] font-bold text-gray-400 uppercase mb-0.5">${formatClock(s.start)} — ${formatClock(s.end)}</p>
+                                <p class="text-xs font-bold text-gray-700">专注时段</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-bold text-blue-600">${Math.floor(s.duration / 60)}m ${s.duration % 60}s</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
         }
 
-        function formatTime(ts) {
-            const d = new Date(ts);
-            return d.getHours().toString().padStart(2, '0') + ':' +
-                   d.getMinutes().toString().padStart(2, '0');
-        }
+        mainBtn.onclick = () => { !state.isFocusing ? startFocus() : stopFocus(false); };
 
-        function formatSec(sec) {
-            const h = Math.floor(sec / 3600);
-            const m = Math.floor((sec % 3600) / 60);
-            const s = sec % 60;
-            let str = '';
-            if (h > 0) str += `${h} 小时 `;
-            if (m > 0) str += `${m} 分钟 `;
-            str += `${s} 秒`;
-            return str;
-        }
+        document.getElementById('share-btn').onclick = () => {
+            const text = `我今天在 Silent Time 保持了 ${totalDisplay.textContent} 的纯净专注。🤫 离手机噪音远了一点。`;
+            navigator.share ? navigator.share({ title: 'Silent Time', text }) : (alert('文案已复制！'), navigator.clipboard.writeText(text));
+        };
 
-        // 初始渲染
-        renderTimeline();
-
-        startBtn.onclick = startChallenge;
-        pauseBtn.onclick = pauseChallenge;
+        renderStats();
     </script>
 </body>
 </html>
