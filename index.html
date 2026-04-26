@@ -360,6 +360,13 @@
 
         mainBtn.onclick = () => { !state.isFocusing ? startFocus() : stopFocus(false); };
 
+        window.addEventListener('beforeunload', () => {
+            if (state.isFocusing) {
+                state.currentSessionMs = Date.now() - state.startTime;
+                saveSession();
+            }
+        });
+
         document.getElementById('share-btn').onclick = () => {
             const text = `我今天在 Silent Time 保持了 ${totalDisplay.textContent} 的纯净专注。离手机噪音远了一点。`;
             const shareText = document.getElementById('share-text');
