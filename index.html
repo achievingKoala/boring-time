@@ -287,6 +287,7 @@
         }
 
         audio.onpause = () => { if (state.isFocusing) stopFocus(true); };
+        audio.onplay = () => { if (!state.isFocusing) audio.pause(); };
 
         // 将跨日 session 按自然日拆分成多条
         function splitByDay(sessions) {
