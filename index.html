@@ -178,13 +178,21 @@
 
         function getTodayHistorySeconds() {
             const today = new Date().toDateString();
-            return state.sessions
+            return splitByDay(state.sessions)
                 .filter(s => new Date(s.start).toDateString() === today)
                 .reduce((acc, s) => acc + s.duration, 0);
         }
 
         function updateTotalDisplay(extraMs) {
-            const totalSeconds = getTodayHistorySeconds() + Math.floor(extraMs / 1000);
+            // 只取当前 session 中属于今天的部分（处理跨日专注）
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const sessionStart = state.startTime || Date.now();
+            const todayPortionMs = sessionStart < todayStart.getTime()
+                ? Date.now() - todayStart.getTime()   // session 跨日，只算今天 00:00 至今
+                : extraMs;                             // session 在今天内，全部计入
+
+            const totalSeconds = getTodayHistorySeconds() + Math.floor(todayPortionMs / 1000);
             const h = Math.floor(totalSeconds / 3600);
             const m = Math.floor((totalSeconds % 3600) / 60);
             const s = totalSeconds % 60;
@@ -279,9 +287,31 @@
 
         audio.onpause = () => { if (state.isFocusing) stopFocus(true); };
 
+        // 将跨日 session 按自然日拆分成多条
+        function splitByDay(sessions) {
+            const result = [];
+            for (const s of sessions) {
+                let cursor = s.start;
+                const end = s.end;
+                while (cursor < end) {
+                    // 当天午夜
+                    const midnight = new Date(cursor);
+                    midnight.setHours(24, 0, 0, 0);
+                    const segEnd = Math.min(midnight.getTime(), end);
+                    result.push({
+                        start: cursor,
+                        end: segEnd,
+                        duration: Math.floor((segEnd - cursor) / 1000)
+                    });
+                    cursor = segEnd;
+                }
+            }
+            return result;
+        }
+
         function renderStats() {
             const today = new Date().toDateString();
-            const todaySessions = state.sessions
+            const todaySessions = splitByDay(state.sessions)
                 .filter(s => new Date(s.start).toDateString() === today)
                 .sort((a, b) => b.start - a.start);
             
