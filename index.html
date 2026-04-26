@@ -21,7 +21,7 @@
             transition: all 0.3s ease;
         }
         .is-focusing .timer-glow {
-            text-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
         }
 
         @keyframes shine-reverse {
@@ -66,20 +66,32 @@
         <!-- Main Timer Card -->
         <main class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 mb-8 text-center border border-gray-100 flex-1 flex flex-col justify-center relative">
             
-            <div id="status-tag" class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 mb-6 uppercase tracking-widest transition-all">
+            <div id="status-tag" class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 mb-8 uppercase tracking-widest transition-all">
                 准备就绪
             </div>
 
-            <!-- 独立进度条 -->
-            <div id="progress-wrapper" class="w-full px-4 mb-8 opacity-0 transition-opacity duration-500">
-                <div class="h-4 w-full bg-gray-100 rounded-full p-1 border border-gray-50 shadow-inner overflow-hidden">
-                    <div id="micro-progress" class="h-full w-0 rounded-full progress-shimmer"></div>
-                </div>
+            <!-- 今日累计 — 主视觉 -->
+            <div class="mb-8">
+                <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">今日累计</p>
+                <div id="total-time" class="text-6xl font-extrabold timer-font tracking-tighter text-gray-900">0 秒</div>
             </div>
 
-            <!-- 毫秒计时器 -->
-            <div id="timer-display" class="text-5xl font-bold mb-10 tabular-nums tracking-tighter timer-font timer-glow">
-                00:00:00<span class="text-2xl text-gray-300">.000</span>
+            <!-- 分割线 -->
+            <div class="w-full border-t border-gray-100 mb-6"></div>
+
+            <!-- 当前专注 -->
+            <div class="mb-6">
+                <p class="text-[10px] font-semibold text-gray-300 uppercase tracking-widest mb-2">当前专注</p>
+                <!-- 独立进度条 -->
+                <div id="progress-wrapper" class="w-full mb-3 opacity-0 transition-opacity duration-500">
+                    <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div id="micro-progress" class="h-full w-0 rounded-full progress-shimmer"></div>
+                    </div>
+                </div>
+                <!-- 计时器 -->
+                <div id="timer-display" class="text-2xl font-bold tabular-nums tracking-tighter timer-font timer-glow text-gray-400">
+                    00:00:00<span class="text-base text-gray-300">.000</span>
+                </div>
             </div>
 
             <div class="space-y-4">
@@ -95,10 +107,7 @@
         <!-- Stats Section -->
         <section class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
             <div class="flex justify-between items-end mb-4">
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-tighter text-[10px]">今日累计</h3>
-                    <div id="total-time" class="text-2xl font-bold">0 分钟</div>
-                </div>
+                <div></div>
                 <div class="text-right">
                     <button id="share-btn" class="text-blue-500 text-xs font-semibold">分享成就 ↗</button>
                 </div>
@@ -167,6 +176,25 @@
             return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         }
 
+        function getTodayHistorySeconds() {
+            const today = new Date().toDateString();
+            return state.sessions
+                .filter(s => new Date(s.start).toDateString() === today)
+                .reduce((acc, s) => acc + s.duration, 0);
+        }
+
+        function updateTotalDisplay(extraMs) {
+            const totalSeconds = getTodayHistorySeconds() + Math.floor(extraMs / 1000);
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            const mm = m.toString().padStart(2, '0');
+            const ss = s.toString().padStart(2, '0');
+            totalDisplay.textContent = h > 0
+                ? `${h}:${mm}:${ss}`
+                : `${m}:${ss}`;
+        }
+
         function updateLoop() {
             if (!state.isFocusing) return;
             
@@ -177,6 +205,9 @@
             const progress = ((state.currentSessionMs % 60000) / 60000) * 100;
             // 直接赋值宽度，不经过 CSS transition，从而实现无感 reset
             microProgress.style.width = `${progress}%`;
+
+            // 实时更新今日累计
+            updateTotalDisplay(state.currentSessionMs);
 
             if (state.currentSessionMs < 5000) {
                 hintText.textContent = "保持绝对静止，深度进入...";
@@ -255,7 +286,14 @@
                 .sort((a, b) => b.start - a.start);
             
             const totalSeconds = todaySessions.reduce((acc, s) => acc + s.duration, 0);
-            totalDisplay.textContent = `${Math.floor(totalSeconds / 60)} 分钟`;
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            const mm = m.toString().padStart(2, '0');
+            const ss = s.toString().padStart(2, '0');
+            totalDisplay.textContent = h > 0
+                ? `${h}:${mm}:${ss}`
+                : `${m}:${ss}`;
 
             timelineContainer.innerHTML = '';
             todaySessions.forEach(s => {
