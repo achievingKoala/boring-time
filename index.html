@@ -60,7 +60,7 @@
         <!-- Header -->
         <header class="text-center mt-8 mb-10">
             <h1 class="text-3xl font-extrabold tracking-tight mb-2">Silent Time</h1>
-            <p class="text-gray-500 text-sm">记录你远离手机噪音的每一毫秒</p>
+            <p class="text-gray-500 text-sm">保护你的安静时间</p>
         </header>
 
         <!-- Main Timer Card -->
@@ -110,6 +110,7 @@
                 <div></div>
                 <div class="text-right">
                     <button id="share-btn" class="text-blue-500 text-xs font-semibold">分享成就 ↗</button>
+                    <p id="share-text" class="text-[10px] text-gray-400 mt-1 hidden"></p>
                 </div>
             </div>
 
@@ -360,8 +361,11 @@
         mainBtn.onclick = () => { !state.isFocusing ? startFocus() : stopFocus(false); };
 
         document.getElementById('share-btn').onclick = () => {
-            const text = `我今天在 Silent Time 保持了 ${totalDisplay.textContent} 的纯净专注。🤫 离手机噪音远了一点。`;
-            navigator.share ? navigator.share({ title: 'Silent Time', text }) : (alert('文案已复制！'), navigator.clipboard.writeText(text));
+            const text = `我今天在 Silent Time 保持了 ${totalDisplay.textContent} 的纯净专注。离手机噪音远了一点。`;
+            const shareText = document.getElementById('share-text');
+            navigator.clipboard.writeText(text).catch(() => {});
+            shareText.textContent = text;
+            shareText.classList.remove('hidden');
         };
 
         renderStats();
