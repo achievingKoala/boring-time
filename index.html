@@ -368,13 +368,13 @@
             }
         });
 
-        document.getElementById('share-btn').onclick = () => {
-            const text = `我今天在 Silent Time 保持了 ${totalDisplay.textContent} 的纯净专注。离手机噪音远了一点。`;
-            const shareText = document.getElementById('share-text');
-            navigator.clipboard.writeText(text).catch(() => {});
-            shareText.textContent = text;
-            shareText.classList.remove('hidden');
-        };
+        // document.getElementById('share-btn').onclick = () => {
+        //     const text = `我今天在 Silent Time 保持了 ${totalDisplay.textContent} 的纯净专注。离手机噪音远了一点。`;
+        //     const shareText = document.getElementById('share-text');
+        //     navigator.clipboard.writeText(text).catch(() => {});
+        //     shareText.textContent = text;
+        //     shareText.classList.remove('hidden');
+        // };
 
         renderStats();
     </script>
