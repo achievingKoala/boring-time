@@ -143,6 +143,9 @@
         <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/rain.mp3" type="audio/mpeg">
     </audio>
 
+    <!-- Supabase SDK -->
+     <script src="https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <script>
         window.onerror = (msg, src, line) => {
             document.body.insertAdjacentHTML('afterbegin',
@@ -156,6 +159,55 @@
             sessions: JSON.parse(localStorage.getItem('silent_sessions') || '[]'),
             timerRequest: null
         };
+
+        // ── Supabase 埋点 ──────────────────────────────────────────
+        let supabaseClient = null;
+        try {
+            supabaseClient = window.supabase.createClient(
+                'https://bbvghqizsardpusrgxzm.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJidmdocWl6c2FyZHB1c3JneHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3ODk2NjEsImV4cCI6MjA4ODM2NTY2MX0.6io59HEeT1kiaG0lpA9YUBtZGArHk-P-ppMNbCh-Zho'
+            );
+        } catch(e) {}
+
+        let anonId = localStorage.getItem('silent_uid');
+        if (!anonId) {
+            anonId = typeof crypto.randomUUID === 'function'
+                ? crypto.randomUUID()
+                : Math.random().toString(36).slice(2) + Date.now().toString(36);
+            localStorage.setItem('silent_uid', anonId);
+        }
+
+        const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+        const deviceType = isMobile ? 'mobile' : 'desktop';
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        function getOS() {
+            const ua = navigator.userAgent;
+            if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+            if (/Android/.test(ua)) return 'Android';
+            if (/Mac/.test(ua)) return 'macOS';
+            if (/Windows/.test(ua)) return 'Windows';
+            if (/Linux/.test(ua)) return 'Linux';
+            return 'unknown';
+        }
+        const os = getOS();
+
+        async function track(event, payload = {}) {
+            if (!supabaseClient) return;
+            try {
+                await supabaseClient.from('silent_events').insert({
+                    anon_id: anonId,
+                    event,
+                    payload: { ...payload, device: deviceType, os, timezone }
+                });
+            } catch (e) {
+                // 埋点失败不影响主流程
+            }
+        }
+
+        // 页面加载
+        track('page_load');
+        // ──────────────────────────────────────────────────────────
 
         const audio = document.getElementById('white-noise');
         const mainBtn = document.getElementById('main-btn');
@@ -252,6 +304,8 @@
             
             audio.play().catch(() => stopFocus(false));
 
+            track('focus_start', { start_time: state.startTime });
+
             document.body.classList.add('is-focusing');
             progressWrapper.classList.replace('opacity-0', 'opacity-100');
             
@@ -267,6 +321,11 @@
         function stopFocus(wasInterrupted = false) {
             cancelAnimationFrame(state.timerRequest);
             saveSession();
+
+            track(wasInterrupted ? 'focus_interrupted' : 'focus_end', {
+                duration_ms: state.currentSessionMs,
+                start_time: state.startTime
+            });
 
             state.isFocusing = false;
             audio.pause();
