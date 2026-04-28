@@ -112,10 +112,9 @@
         <section class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
             <div class="flex justify-between items-end mb-4">
                 <div></div>
-                <!-- <div class="text-right">
+                <div class="text-right">
                     <button id="share-btn" class="text-blue-500 text-xs font-semibold">分享成就 ↗</button>
-                    <p id="share-text" class="text-[10px] text-gray-400 mt-1 hidden"></p>
-                </div> -->
+                </div>
             </div>
 
             <div class="relative w-full h-4 bg-gray-100 rounded-full overflow-hidden mb-2" id="timeline-container"></div>
@@ -140,6 +139,54 @@
                 Pure Static • Precision Mode
             </p>
         </footer>
+    </div>
+
+    <!-- 分享弹窗 -->
+    <div id="share-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <!-- 遮罩 -->
+        <div id="share-overlay" class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+        <!-- 弹窗内容 -->
+        <div class="relative bg-white rounded-3xl shadow-2xl pt-8 pb-6 px-8 w-[90%] max-w-sm mx-auto z-10">
+            <!-- 关闭按钮 -->
+            <button id="share-close" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500 text-2xl leading-none">&times;</button>
+
+            <!-- Logo 品牌区 -->
+            <div class="flex items-center justify-center gap-2 mb-5">
+                <img src="favicon.png" class="w-9 h-9 opacity-80" alt="logo">
+                <span class="text-xl font-extrabold tracking-tight text-gray-500">Silent Time</span>
+            </div>
+
+            <!-- 顶部：日期 + 专注时间大字 -->
+            <div class="text-center mb-6">
+                <p id="share-date-label" class="text-[10px] text-gray-400 uppercase tracking-widest mb-4"></p>
+                <p id="share-focus-time" class="text-5xl font-extrabold timer-font text-blue-500 leading-none">—</p>
+                <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mt-2">安静时间</p>
+            </div>
+
+            <!-- 有声时间 — 小字配角 -->
+            <div class="text-center mb-6">
+                <p id="share-noise-time" class="text-base font-bold timer-font text-orange-300 leading-none">—</p>
+                <p class="text-[9px] font-semibold text-gray-300 uppercase tracking-widest mb-1">有声时间</p>
+            </div>
+
+            <!-- 饼状图 -->
+            <div class="flex flex-col items-center mb-4">
+                <canvas id="share-pie" width="180" height="180"></canvas>
+                <div class="flex gap-6 mt-3">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
+                        <span class="text-[11px] text-gray-500">安静</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-orange-300 inline-block"></span>
+                        <span class="text-[11px] text-gray-400">有声</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 统计范围 -->
+            <p id="share-range-label" class="text-[10px] text-gray-300 text-center"></p>
+        </div>
     </div>
 
     <!-- 核心音频 -->
@@ -436,13 +483,128 @@
             }
         });
 
-        // document.getElementById('share-btn').onclick = () => {
-        //     const text = `我今天在 Silent Time 保持了 ${totalDisplay.textContent} 的纯净专注。离手机噪音远了一点。`;
-        //     const shareText = document.getElementById('share-text');
-        //     navigator.clipboard.writeText(text).catch(() => {});
-        //     shareText.textContent = text;
-        //     shareText.classList.remove('hidden');
-        // };
+        // ── 分享弹窗 ──────────────────────────────────────────────
+        const shareModal   = document.getElementById('share-modal');
+        const shareOverlay = document.getElementById('share-overlay');
+        const shareClose   = document.getElementById('share-close');
+
+        function formatMinSec(totalSeconds) {
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            if (h > 0) return `${h}h ${m.toString().padStart(2,'0')}m`;
+            if (m > 0) return `${m}m ${s.toString().padStart(2,'0')}s`;
+            return `${s}s`;
+        }
+
+        function drawPie(canvas, focusSec, noiseSec) {
+            const ctx = canvas.getContext('2d');
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const r  = Math.min(cx, cy) - 10;
+            const total = focusSec + noiseSec;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (total === 0) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fillStyle = '#f3f4f6';
+                ctx.fill();
+                ctx.fillStyle = '#9ca3af';
+                ctx.font = 'bold 13px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('暂无数据', cx, cy);
+                return;
+            }
+
+            const focusAngle = (focusSec / total) * Math.PI * 2;
+            const noiseAngle = Math.PI * 2 - focusAngle;
+            const startAngle = -Math.PI / 2;
+
+            if (focusSec > 0) {
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, r, startAngle, startAngle + focusAngle);
+                ctx.closePath();
+                ctx.fillStyle = '#3b82f6';
+                ctx.fill();
+            }
+
+            if (noiseSec > 0) {
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, r, startAngle + focusAngle, startAngle + focusAngle + noiseAngle);
+                ctx.closePath();
+                ctx.fillStyle = '#fdba74';
+                ctx.fill();
+            }
+
+            // 中心白圆（甜甜圈效果）
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+
+            // 中心专注率
+            const pct = Math.round((focusSec / total) * 100);
+            ctx.fillStyle = '#1f2937';
+            ctx.font = `bold ${Math.round(r * 0.28)}px JetBrains Mono, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${pct}%`, cx, cy - r * 0.06);
+            ctx.font = `${Math.round(r * 0.14)}px Inter, sans-serif`;
+            ctx.fillStyle = '#9ca3af';
+            ctx.fillText('专注率', cx, cy + r * 0.18);
+        }
+
+        function openShareModal() {
+            const now = Date.now();
+            const today8am = new Date();
+            today8am.setHours(8, 0, 0, 0);
+            const rangeStart = today8am.getTime();
+
+            if (now < rangeStart) {
+                alert('还没到 08:00，暂无数据哦 🌙');
+                return;
+            }
+
+            const totalRangeSec = Math.floor((now - rangeStart) / 1000);
+
+            // 含正在进行的 session
+            let allSessions = [...state.sessions];
+            if (state.isFocusing) {
+                allSessions.push({ start: state.startTime, end: now, duration: Math.floor((now - state.startTime) / 1000) });
+            }
+
+            // 只取 08:00 之后的专注秒数
+            const focusSec = splitByDay(allSessions).reduce((acc, s) => {
+                const segStart = Math.max(s.start, rangeStart);
+                const segEnd   = Math.min(s.end, now);
+                return segEnd > segStart ? acc + Math.floor((segEnd - segStart) / 1000) : acc;
+            }, 0);
+
+            const noiseSec = Math.max(0, totalRangeSec - focusSec);
+
+            document.getElementById('share-focus-time').textContent = formatMinSec(focusSec);
+            document.getElementById('share-noise-time').textContent = formatMinSec(noiseSec);
+
+            const nowDate = new Date();
+            // document.getElementById('share-date-label').textContent =
+            //     `${nowDate.getFullYear()}.${(nowDate.getMonth()+1).toString().padStart(2,'0')}.${nowDate.getDate().toString().padStart(2,'0')}`;
+
+            const nowTimeStr = `${nowDate.getHours().toString().padStart(2,'0')}:${nowDate.getMinutes().toString().padStart(2,'0')}`;
+            document.getElementById('share-range-label').textContent = `统计范围：08:00 — ${nowTimeStr}`;
+
+            drawPie(document.getElementById('share-pie'), focusSec, noiseSec);
+            shareModal.classList.remove('hidden');
+        }
+
+        document.getElementById('share-btn').onclick = openShareModal;
+        shareClose.onclick   = () => shareModal.classList.add('hidden');
+        shareOverlay.onclick = () => shareModal.classList.add('hidden');
+        // ──────────────────────────────────────────────────────────
 
         renderStats();
     </script>
