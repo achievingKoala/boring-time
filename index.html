@@ -190,8 +190,17 @@
     </div>
 
     <!-- 核心音频 -->
-    <audio id="white-noise" loop preload="auto">
+    <audio id="white-noise" preload="auto">
         <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/rain.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="white-noise-2" preload="auto">
+        <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/waterfall.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="white-noise-3" preload="auto">
+        <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/thunder.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="white-noise-4" preload="auto">
+        <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/waves.mp3" type="audio/mpeg">
     </audio>
 
     <!-- Supabase SDK -->
@@ -260,7 +269,32 @@
         track('page_load');
         // ──────────────────────────────────────────────────────────
 
-        const audio = document.getElementById('white-noise');
+        const audios = [
+            document.getElementById('white-noise'),
+            document.getElementById('white-noise-2'),
+            document.getElementById('white-noise-3'),
+            document.getElementById('white-noise-4')
+        ];
+        let currentAudioIdx = 0;
+
+        function currentAudio() { return audios[currentAudioIdx]; }
+
+        function playNextAudio() {
+            // 随机选一首，避免和当前同一首
+            let nextIdx;
+            do { nextIdx = Math.floor(Math.random() * audios.length); }
+            while (nextIdx === currentAudioIdx && audios.length > 1);
+            currentAudioIdx = nextIdx;
+            const next = currentAudio();
+            next.currentTime = 0;
+            next.play().catch(() => stopFocus(true));
+        }
+
+        audios.forEach(a => {
+            a.onended = () => { if (state.isFocusing) playNextAudio(); };
+            a.onpause = () => { if (state.isFocusing) stopFocus(true); };
+            a.onplay  = () => { if (!state.isFocusing) a.pause(); };
+        });
         const mainBtn = document.getElementById('main-btn');
         const timerDisplay = document.getElementById('timer-display');
         const statusTag = document.getElementById('status-tag');
@@ -353,7 +387,8 @@
             state.startTime = Date.now();
             state.currentSessionMs = 0;
             
-            audio.play().catch(() => stopFocus(false));
+            currentAudioIdx = Math.floor(Math.random() * audios.length);
+            currentAudio().play().catch(() => stopFocus(false));
 
             track('focus_start', { start_time: state.startTime });
 
@@ -379,8 +414,8 @@
             });
 
             state.isFocusing = false;
-            audio.pause();
-            audio.currentTime = 0;
+            audios.forEach(a => { a.pause(); a.currentTime = 0; });
+            currentAudioIdx = 0;
             
             progressWrapper.classList.replace('opacity-100', 'opacity-0');
             microProgress.style.width = '0';
@@ -400,9 +435,6 @@
             mainBtn.textContent = "再次开始";
             mainBtn.className = "w-full py-5 rounded-2xl bg-black text-white font-bold text-xl shadow-lg active:scale-95 transition-transform";
         }
-
-        audio.onpause = () => { if (state.isFocusing) stopFocus(true); };
-        audio.onplay = () => { if (!state.isFocusing) audio.pause(); };
 
         // 将跨日 session 按自然日拆分成多条
         function splitByDay(sessions) {
