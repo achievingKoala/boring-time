@@ -292,7 +292,7 @@
 
         audios.forEach(a => {
             a.onended = () => { if (state.isFocusing) playNextAudio(); };
-            a.onpause = () => { if (state.isFocusing) stopFocus(true); };
+            a.onpause = () => { if (state.isFocusing && !a.ended) stopFocus(true); };
             a.onplay  = () => { if (!state.isFocusing) a.pause(); };
         });
         const mainBtn = document.getElementById('main-btn');
