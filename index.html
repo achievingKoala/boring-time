@@ -105,7 +105,10 @@
                 <p id="hint-text" class="text-xs text-gray-400 h-4">
                     点击后将播放静音白噪音以感知干扰
                 </p>
-                <p id="now-playing" class="text-[10px] text-gray-300 mt-2 h-3 tracking-wide"></p>
+                <div class="flex items-center justify-center gap-3 h-4 mt-2">
+                    <p id="now-playing" class="text-[10px] text-gray-300 tracking-wide"></p>
+                    <button id="next-track-btn" class="hidden text-[10px] text-gray-300 hover:text-blue-400 active:scale-95 transition-all">⏭ 下一首</button>
+                </div>
             </div>
         </main>
 
@@ -192,7 +195,7 @@
 
     <!-- 核心音频 -->
     <audio id="white-noise" preload="auto">
-        <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/rain.mp3" type="audio/mpeg">
+        <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/raining-clouds.mp3" type="audio/mpeg">
     </audio>
     <audio id="white-noise-2" preload="auto">
         <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/waterfall.mp3" type="audio/mpeg">
@@ -283,29 +286,44 @@
 
         function updateNowPlaying() {
             const el = document.getElementById('now-playing');
+            const btn = document.getElementById('next-track-btn');
             if (state.isFocusing) {
                 el.textContent = `♪ ${audioNames[currentAudioIdx]}`;
+                btn.classList.remove('hidden');
             } else {
                 el.textContent = '';
+                btn.classList.add('hidden');
             }
         }
 
+        document.getElementById('next-track-btn').onclick = () => {
+            if (!state.isFocusing) return;
+            skippingTrack = true;
+            const cur = currentAudio();
+            cur.pause();
+            cur.currentTime = 0;
+            setTimeout(() => {
+                skippingTrack = false;
+                playNextAudio();
+            }, 50);
+        };
+
         function playNextAudio() {
-            // 随机选一首，避免和当前同一首
-            let nextIdx;
-            do { nextIdx = Math.floor(Math.random() * audios.length); }
-            while (nextIdx === currentAudioIdx && audios.length > 1);
-            currentAudioIdx = nextIdx;
+            currentAudioIdx = (currentAudioIdx + 1) % audios.length;
             const next = currentAudio();
             next.currentTime = 0;
             next.play().catch(() => stopFocus(true));
             updateNowPlaying();
         }
 
+        let skippingTrack = false;
+
         audios.forEach(a => {
-            a.onended = () => { if (state.isFocusing) playNextAudio(); };
-            a.onpause = () => { if (state.isFocusing && !a.ended) stopFocus(true); };
-            a.onplay  = () => { if (!state.isFocusing) a.pause(); };
+            a.addEventListener('ended', () => { if (state.isFocusing) playNextAudio(); });
+            a.addEventListener('pause', () => {
+                if (state.isFocusing && !a.ended && !skippingTrack) stopFocus(true);
+            });
+            a.addEventListener('play', () => { if (!state.isFocusing) a.pause(); });
         });
         const mainBtn = document.getElementById('main-btn');
         const timerDisplay = document.getElementById('timer-display');
@@ -399,7 +417,7 @@
             state.startTime = Date.now();
             state.currentSessionMs = 0;
             
-            currentAudioIdx = Math.floor(Math.random() * audios.length);
+            currentAudioIdx = (currentAudioIdx + 1) % audios.length;
             currentAudio().play().catch(() => stopFocus(false));
             updateNowPlaying();
 
