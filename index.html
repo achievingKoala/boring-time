@@ -105,6 +105,7 @@
                 <p id="hint-text" class="text-xs text-gray-400 h-4">
                     点击后将播放静音白噪音以感知干扰
                 </p>
+                <p id="now-playing" class="text-[10px] text-gray-300 mt-2 h-3 tracking-wide"></p>
             </div>
         </main>
 
@@ -275,9 +276,19 @@
             document.getElementById('white-noise-3'),
             document.getElementById('white-noise-4')
         ];
+        const audioNames = ['🌧 Rain', '💧 Waterfall', '⛈ Thunder', '🌊 Waves'];
         let currentAudioIdx = 0;
 
         function currentAudio() { return audios[currentAudioIdx]; }
+
+        function updateNowPlaying() {
+            const el = document.getElementById('now-playing');
+            if (state.isFocusing) {
+                el.textContent = `♪ ${audioNames[currentAudioIdx]}`;
+            } else {
+                el.textContent = '';
+            }
+        }
 
         function playNextAudio() {
             // 随机选一首，避免和当前同一首
@@ -288,6 +299,7 @@
             const next = currentAudio();
             next.currentTime = 0;
             next.play().catch(() => stopFocus(true));
+            updateNowPlaying();
         }
 
         audios.forEach(a => {
@@ -389,6 +401,7 @@
             
             currentAudioIdx = Math.floor(Math.random() * audios.length);
             currentAudio().play().catch(() => stopFocus(false));
+            updateNowPlaying();
 
             track('focus_start', { start_time: state.startTime });
 
@@ -416,6 +429,7 @@
             state.isFocusing = false;
             audios.forEach(a => { a.pause(); a.currentTime = 0; });
             currentAudioIdx = 0;
+            updateNowPlaying();
             
             progressWrapper.classList.replace('opacity-100', 'opacity-0');
             microProgress.style.width = '0';
