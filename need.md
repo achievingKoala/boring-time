@@ -1,4 +1,5 @@
 1. todo 邮件通知
+
 2. done 不要赌注 ，不要结束并结算，打开网页后自动结算
 
 3. done 打断后 不要 显示抓到你了
@@ -79,9 +80,16 @@ const supabaseClient = window.supabase.createClient(
 ); 
 
 
-29. todo： 白噪音循环 播放
-
+29. todo： 
+白噪音循环 播放
+加一首：
 add https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/waterfall.mp3
+
+https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/thunder.mp3
+
+https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/waves.mp3
+
+
 
 
 30. todo: 中断 5s 后继续 可以不算中断
