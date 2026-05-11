@@ -194,16 +194,16 @@
     </div>
 
     <!-- 核心音频 -->
-    <audio id="white-noise" preload="auto">
+    <audio id="white-noise" loop preload="auto" playsinline>
         <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/raining-clouds.mp3" type="audio/mpeg">
     </audio>
-    <audio id="white-noise-2" preload="auto">
+    <audio id="white-noise-2" loop preload="auto" playsinline>
         <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/waterfall.mp3" type="audio/mpeg">
     </audio>
-    <audio id="white-noise-3" preload="auto">
+    <audio id="white-noise-3" loop preload="auto" playsinline>
         <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/thunder.mp3" type="audio/mpeg">
     </audio>
-    <audio id="white-noise-4" preload="auto">
+    <audio id="white-noise-4" loop preload="auto" playsinline>
         <source src="https://elckemvmphbjjlpzgoqy.supabase.co/storage/v1/object/public/white-sound/waves.mp3" type="audio/mpeg">
     </audio>
 
@@ -281,8 +281,15 @@
         ];
         const audioNames = ['🌧 Rain', '💧 Waterfall', '⛈ Thunder', '🌊 Waves'];
         let currentAudioIdx = 0;
+        let isStartingAudio = false;
+        let suppressPauseStop = false;
+        const AUDIO_START_TIMEOUT_MS = 8000;
 
         function currentAudio() { return audios[currentAudioIdx]; }
+
+        audios.forEach(a => {
+            a.volume = 1;
+        });
 
         function updateNowPlaying() {
             const el = document.getElementById('now-playing');
@@ -297,23 +304,87 @@
         }
 
         document.getElementById('next-track-btn').onclick = () => {
-            if (!state.isFocusing) return;
-            skippingTrack = true;
-            const cur = currentAudio();
-            cur.pause();
-            cur.currentTime = 0;
-            setTimeout(() => {
-                skippingTrack = false;
-                playNextAudio();
-            }, 50);
+            if (!state.isFocusing || isStartingAudio) return;
+            playNextAudio();
         };
 
-        function playNextAudio() {
-            currentAudioIdx = (currentAudioIdx + 1) % audios.length;
-            const next = currentAudio();
-            next.currentTime = 0;
-            next.play().catch(() => stopFocus(true));
-            updateNowPlaying();
+        function waitForAudioStart(audio) {
+            if (!audio.paused && audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                return Promise.resolve();
+            }
+
+            return new Promise((resolve, reject) => {
+                let settled = false;
+                const cleanup = () => {
+                    clearTimeout(timeout);
+                    audio.removeEventListener('playing', onPlaying);
+                    audio.removeEventListener('timeupdate', onPlaying);
+                    audio.removeEventListener('canplay', onCanPlay);
+                    audio.removeEventListener('error', onError);
+                    audio.removeEventListener('stalled', onError);
+                };
+                const finish = (fn, value) => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    fn(value);
+                };
+                const onPlaying = () => finish(resolve);
+                const onCanPlay = () => {
+                    if (!audio.paused) finish(resolve);
+                };
+                const onError = () => finish(reject, new Error('audio failed'));
+                const timeout = setTimeout(() => finish(reject, new Error('audio timeout')), AUDIO_START_TIMEOUT_MS);
+
+                audio.addEventListener('playing', onPlaying);
+                audio.addEventListener('timeupdate', onPlaying);
+                audio.addEventListener('canplay', onCanPlay);
+                audio.addEventListener('error', onError);
+                audio.addEventListener('stalled', onError);
+            });
+        }
+
+        async function playAudioFromIndex(startIndex) {
+            let lastError = null;
+            isStartingAudio = true;
+            suppressPauseStop = true;
+
+            for (let attempt = 0; attempt < audios.length; attempt++) {
+                currentAudioIdx = (startIndex + attempt) % audios.length;
+                audios.forEach((a, idx) => {
+                    if (idx === currentAudioIdx) return;
+                    a.pause();
+                    a.currentTime = 0;
+                });
+
+                const audio = currentAudio();
+                try {
+                    audio.currentTime = 0;
+                    audio.load();
+                    await audio.play();
+                    await waitForAudioStart(audio);
+                    updateNowPlaying();
+                    return true;
+                } catch (error) {
+                    lastError = error;
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            }
+
+            track('audio_start_failed', {
+                track: audioNames[currentAudioIdx],
+                error: lastError ? String(lastError.message || lastError) : 'unknown'
+            });
+            return false;
+        }
+
+        async function playNextAudio() {
+            const nextIndex = (currentAudioIdx + 1) % audios.length;
+            const played = await playAudioFromIndex(nextIndex);
+            isStartingAudio = false;
+            suppressPauseStop = false;
+            if (!played && state.isFocusing) stopFocus(true);
         }
 
         let skippingTrack = false;
@@ -321,9 +392,9 @@
         audios.forEach(a => {
             a.addEventListener('ended', () => { if (state.isFocusing) playNextAudio(); });
             a.addEventListener('pause', () => {
-                if (state.isFocusing && !a.ended && !skippingTrack) stopFocus(true);
+                if (state.isFocusing && !a.ended && !skippingTrack && !suppressPauseStop) stopFocus(true);
             });
-            a.addEventListener('play', () => { if (!state.isFocusing) a.pause(); });
+            a.addEventListener('play', () => { if (!state.isFocusing && !isStartingAudio) a.pause(); });
         });
         const mainBtn = document.getElementById('main-btn');
         const timerDisplay = document.getElementById('timer-display');
@@ -412,13 +483,31 @@
             }
         }
 
-        function startFocus() {
+        async function startFocus() {
+            if (isStartingAudio) return;
+
+            isStartingAudio = true;
+            mainBtn.disabled = true;
+            mainBtn.textContent = "正在启动声音...";
+            hintText.textContent = "正在连接白噪音";
+
+            const startIndex = currentAudioIdx;
+            const audioStarted = await playAudioFromIndex(startIndex);
+            isStartingAudio = false;
+            suppressPauseStop = false;
+
+            if (!audioStarted) {
+                mainBtn.disabled = false;
+                mainBtn.textContent = "开始专注";
+                hintText.textContent = "声音启动失败，请检查网络或稍后重试";
+                statusTag.textContent = "声音未启动";
+                statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-600 mb-8 uppercase tracking-widest";
+                return;
+            }
+
             state.isFocusing = true;
             state.startTime = Date.now();
             state.currentSessionMs = 0;
-            
-            currentAudioIdx = (currentAudioIdx + 1) % audios.length;
-            currentAudio().play().catch(() => stopFocus(false));
             updateNowPlaying();
 
             track('focus_start', { start_time: state.startTime });
@@ -429,6 +518,7 @@
             statusTag.textContent = "深度专注中";
             statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-blue-500 text-white mb-6 uppercase tracking-widest shadow-md";
             
+            mainBtn.disabled = false;
             mainBtn.textContent = "结束本次专注";
             mainBtn.className = "w-full py-5 rounded-2xl bg-gray-100 text-gray-400 font-bold text-xl active:scale-95 transition-transform";
 
@@ -436,6 +526,10 @@
         }
 
         function stopFocus(wasInterrupted = false) {
+            if (!state.isFocusing) return;
+
+            state.currentSessionMs = Date.now() - state.startTime;
+            state.isFocusing = false;
             cancelAnimationFrame(state.timerRequest);
             saveSession();
 
@@ -444,7 +538,6 @@
                 start_time: state.startTime
             });
 
-            state.isFocusing = false;
             audios.forEach(a => { a.pause(); a.currentTime = 0; });
             currentAudioIdx = 0;
             updateNowPlaying();
