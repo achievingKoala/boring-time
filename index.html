@@ -53,18 +53,38 @@
         #micro-progress {
             transition: none; 
         }
+
+        .cat-scene { height: 185px; position: relative; overflow: hidden; margin: -12px 0 12px; }
+        .cat-stage { width: 250px; max-width: 100%; height: 160px; position: relative; margin: auto; }
+        .cat-cushion { position: absolute; width: 250px; max-width: 100%; height: auto; bottom: -8px; left: 50%; transform: translateX(-50%); user-select: none; }
+        .cat-stage .cat-actor { position: absolute; width: 190px; height: 127px; bottom: 33px; left: calc(50% - 95px); }
+        .cat-body { display: block; width: 100%; height: 100%; object-fit: contain; transform-origin: center 86%; user-select: none; }
+        .cat-actor { opacity: 0; transform: translateX(-170px); transform-box: fill-box; transform-origin: center bottom; }
+        .cat-scene[data-state="entering"] .cat-actor { animation: cat-enter 1.1s ease-out forwards; }
+        .cat-scene[data-state="resting"] .cat-actor { opacity: 1; transform: none; }
+        .cat-scene[data-state="resting"] .cat-body { animation: cat-breathe 4s ease-in-out infinite; }
+        .cat-scene[data-state="startled"] .cat-actor { animation: cat-flee 1s ease-in forwards; }
+        .cat-scene[data-state="goodbye"] .cat-actor { animation: cat-goodbye 1.8s ease-in-out forwards; }
+        .cat-caption { margin: 0; color: #9a8c7e; font-size: 12px; line-height: 20px; }
+        @keyframes cat-enter { from { opacity: 0; transform: translateX(-170px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes cat-breathe { 50% { transform: scaleY(1.035); } }
+        @keyframes cat-flee { 0% { opacity: 1; transform: translateY(0); } 25% { opacity: 1; transform: translateY(-7px); } 100% { opacity: 0; transform: translateX(210px); } }
+        @keyframes cat-goodbye { 0% { opacity: 1; transform: scaleY(1); } 30% { opacity: 1; transform: scaleY(1.08); } 100% { opacity: 0; transform: translateX(210px); } }
+        @media (prefers-reduced-motion: reduce) {
+            .cat-scene .cat-actor, .cat-scene .cat-body { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col items-center p-6">
 
     <div class="w-full max-w-md flex-1 flex flex-col">
         <!-- Header -->
-        <header class="text-center mt-8 mb-10">
-            <div class="flex items-center justify-center gap-2 mb-2">
-                <img src="favicon.png" class="w-12 h-12" alt="logo">
-                <h1 class="text-3xl font-extrabold tracking-tight">Silent Time</h1>
+        <header class="text-center mt-3 mb-6">
+            <div class="flex items-center justify-center gap-2 mb-1">
+                <img src="favicon.png" class="w-8 h-8" alt="logo">
+                <h1 class="text-xl font-semibold tracking-tight">Silent Time</h1>
             </div>
-            <p class="text-gray-500 text-sm">保护你的安静时间</p>
+            <p class="text-gray-500 text-xs">保护你的安静时间</p>
         </header>
 
         <!-- Main Timer Card -->
@@ -78,6 +98,15 @@
             <div class="mb-8">
                 <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">今日累计</p>
                 <div id="total-time" class="text-6xl font-extrabold timer-font tracking-tighter text-gray-900">0 秒</div>
+            </div>
+
+            <!-- 猫咪陪伴：音频成功播放才进场，离开后保留空垫子 -->
+            <div id="cat-scene" class="cat-scene" data-state="waiting">
+                <div class="cat-stage" aria-hidden="true">
+                    <img class="cat-cushion" src="assets/images/cat-cushion.png" alt="" width="1536" height="1024" decoding="async" draggable="false">
+                    <div class="cat-actor"><img class="cat-body" src="assets/images/awake-cat.png" alt="" width="1536" height="1024" decoding="async" draggable="false"></div>
+                </div>
+                <p id="cat-caption" class="cat-caption" role="status" aria-live="polite">留一段安静，等猫咪来</p>
             </div>
 
             <!-- 分割线 -->
@@ -102,8 +131,12 @@
                 <button id="main-btn" class="w-full py-5 rounded-2xl bg-black text-white font-bold text-xl shadow-lg active:scale-95 transition-transform">
                     开始专注
                 </button>
-                <p id="hint-text" class="text-xs text-gray-400 h-4">
-                    点击后将播放静音白噪音以感知干扰
+                <p class="text-xs text-gray-500 leading-relaxed">
+                    环境音播放时，猫咪陪你专注。<br>
+                    声音被其他应用打断时，猫咪会离开，计时结束并保存。
+                </p>
+                <p id="hint-text" class="text-xs text-gray-400 min-h-4 leading-relaxed" role="status">
+                    播放自然白噪音，让猫咪安静陪你
                 </p>
                 <div class="flex items-center justify-center gap-3 h-4 mt-2">
                     <p id="now-playing" class="text-[10px] text-gray-300 tracking-wide"></p>
@@ -131,6 +164,7 @@
             <!-- 历史列表 -->
             <div class="space-y-3">
                 <h4 class="text-[10px] font-bold text-gray-300 uppercase tracking-widest">专注历史</h4>
+                <p class="text-xs text-gray-500 leading-relaxed">专注记录保存在当前浏览器，清除浏览器数据后会丢失。</p>
                 <div id="session-list" class="max-h-48 overflow-y-auto space-y-2 pr-1">
                     <p class="text-xs text-gray-400 text-center py-4">今天还没有记录</p>
                 </div>
@@ -406,6 +440,22 @@
         const microProgress = document.getElementById('micro-progress');
         const progressWrapper = document.getElementById('progress-wrapper');
 
+        const catScene = document.getElementById('cat-scene');
+        const catCaption = document.getElementById('cat-caption');
+        let catTransitionTimer = null;
+
+        function setCatState(nextState, caption) {
+            clearTimeout(catTransitionTimer);
+            catScene.dataset.state = nextState;
+            catCaption.textContent = caption;
+            const duration = { entering: 1100, startled: 1000, goodbye: 1800 }[nextState];
+            if (duration) {
+                catTransitionTimer = setTimeout(() => {
+                    catScene.dataset.state = nextState === 'entering' ? 'resting' : 'away';
+                }, duration);
+            }
+        }
+
         function formatTimeDetailed(ms) {
             const totalSeconds = Math.floor(ms / 1000);
             const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
@@ -491,6 +541,8 @@
             mainBtn.textContent = "正在启动声音...";
             hintText.textContent = "正在连接白噪音";
 
+            const previousCatCaption = catCaption.textContent;
+            catCaption.textContent = "正在准备声音，等猫咪来…";
             const startIndex = currentAudioIdx;
             const audioStarted = await playAudioFromIndex(startIndex);
             isStartingAudio = false;
@@ -499,12 +551,14 @@
             if (!audioStarted) {
                 mainBtn.disabled = false;
                 mainBtn.textContent = "开始专注";
+                catCaption.textContent = previousCatCaption;
                 hintText.textContent = "声音启动失败，请检查网络或稍后重试";
                 statusTag.textContent = "声音未启动";
                 statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-600 mb-8 uppercase tracking-widest";
                 return;
             }
 
+            setCatState("entering", "猫咪正在安静陪你");
             state.isFocusing = true;
             state.startTime = Date.now();
             state.currentSessionMs = 0;
@@ -548,16 +602,18 @@
             document.body.classList.remove('is-focusing');
             
             if (wasInterrupted) {
+                setCatState("startled", "声音打断了安静，猫咪离开了");
                 statusTag.textContent = "检测到干扰！";
                 statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-600 mb-6 uppercase tracking-widest";
                 hintText.textContent = "声音被抢占，专注已强制停止";
             } else {
+                setCatState("goodbye", `这次一起安静了 ${formatMinSec(Math.floor(state.currentSessionMs / 1000))}`);
                 statusTag.textContent = "专注已保存";
                 statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 mb-6 uppercase tracking-widest";
                 hintText.textContent = "准备好开始下一段纯净时间了吗？";
             }
 
-            mainBtn.textContent = "再次开始";
+            mainBtn.textContent = wasInterrupted ? "邀请猫咪回来" : "再次开始";
             mainBtn.className = "w-full py-5 rounded-2xl bg-black text-white font-bold text-xl shadow-lg active:scale-95 transition-transform";
         }
 
