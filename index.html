@@ -54,11 +54,19 @@
             transition: none; 
         }
 
-        .cat-scene { height: 185px; position: relative; overflow: hidden; margin: -12px 0 12px; }
-        .cat-stage { width: 250px; max-width: 100%; height: 160px; position: relative; margin: auto; }
-        .cat-cushion { position: absolute; width: 250px; max-width: 100%; height: auto; bottom: -8px; left: 50%; transform: translateX(-50%); user-select: none; }
-        .cat-stage .cat-actor { position: absolute; width: 190px; height: 127px; bottom: 33px; left: calc(50% - 95px); }
+        .cat-scene { min-height: 185px; position: relative; overflow: hidden; margin: -12px 0 12px; }
+        .cat-stage { width: 320px; max-width: 100%; aspect-ratio: 250 / 160; position: relative; margin: auto; }
+        .cat-cushion { position: absolute; width: 100%; max-width: 100%; height: auto; bottom: -5%; left: 50%; transform: translateX(-50%); user-select: none; }
+        .cat-stage .cat-actor { position: absolute; width: 76%; aspect-ratio: 1536 / 1024; bottom: 20.625%; left: 12%; }
         .cat-body { display: block; width: 100%; height: 100%; object-fit: contain; transform-origin: center 86%; user-select: none; }
+        .cat-frame { position: relative; width: 100%; height: 100%; }
+        .cat-detail { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; pointer-events: none; }
+        .cat-blink-left { clip-path: ellipse(6% 5% at 28.5% 48%); }
+        .cat-blink-right { clip-path: ellipse(6% 6% at 44% 40%); }
+        .cat-frame[data-motion="blink"] .cat-blink-left, .cat-frame[data-motion="blink"] .cat-blink-right { opacity: 1; }
+        .cat-frame[data-motion="ear"] .cat-base { clip-path: polygon(0 0, 35% 0, 35% 26%, 55% 26%, 55% 0, 100% 0, 100% 100%, 0 100%); }
+        .cat-ear-frame { clip-path: polygon(35% 0, 55% 0, 55% 26%, 35% 26%); }
+        .cat-frame[data-motion="ear"] .cat-ear-frame { opacity: 1; }
         .cat-actor { opacity: 0; transform: translateX(-170px); transform-box: fill-box; transform-origin: center bottom; }
         .cat-scene[data-state="entering"] .cat-actor { animation: cat-enter 1.1s ease-out forwards; }
         .cat-scene[data-state="resting"] .cat-actor { opacity: 1; transform: none; }
@@ -81,7 +89,7 @@
         <!-- Header -->
         <header class="text-center mt-3 mb-6">
             <div class="flex items-center justify-center gap-2 mb-1">
-                <img src="favicon.png" class="w-8 h-8" alt="logo">
+                <img src="favicon.png" class="w-6 h-6" alt="logo">
                 <h1 class="text-xl font-semibold tracking-tight">Silent Time</h1>
             </div>
             <p class="text-gray-500 text-xs">保护你的安静时间</p>
@@ -104,7 +112,12 @@
             <div id="cat-scene" class="cat-scene" data-state="waiting">
                 <div class="cat-stage" aria-hidden="true">
                     <img class="cat-cushion" src="assets/images/cat-cushion.png" alt="" width="1536" height="1024" decoding="async" draggable="false">
-                    <div class="cat-actor"><img class="cat-body" src="assets/images/awake-cat.png" alt="" width="1536" height="1024" decoding="async" draggable="false"></div>
+                    <div class="cat-actor"><div class="cat-body"><div id="cat-frame" class="cat-frame" data-motion="idle">
+                        <img class="cat-detail cat-base" style="position:relative;opacity:1" src="assets/images/awake-cat.png" alt="" width="1536" height="1024" draggable="false">
+                        <img class="cat-detail cat-blink-left" src="assets/images/cat-blink.png" alt="" draggable="false">
+                        <img class="cat-detail cat-blink-right" src="assets/images/cat-blink.png" alt="" draggable="false">
+                        <img class="cat-detail cat-ear-frame" src="assets/images/cat-ear.png" alt="" draggable="false">
+                    </div></div></div>
                 </div>
                 <p id="cat-caption" class="cat-caption" role="status" aria-live="polite">留一段安静，等猫咪来</p>
             </div>
@@ -444,7 +457,42 @@
         const catCaption = document.getElementById('cat-caption');
         let catTransitionTimer = null;
 
+        const catFrame = document.getElementById('cat-frame');
+        const catMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+        let catBlinkTimer, catEarTimer, catMotionResetTimer;
+
+        function stopCatMotions() {
+            clearTimeout(catBlinkTimer);
+            clearTimeout(catEarTimer);
+            clearTimeout(catMotionResetTimer);
+            catFrame.dataset.motion = 'idle';
+        }
+
+        function startCatMotions() {
+            stopCatMotions();
+            if (catScene.dataset.state !== 'resting' || document.hidden || catMotionPreference.matches) return;
+            function schedule(kind, first = false) {
+                const delay = kind === 'blink'
+                    ? (first ? 2000 : 4000 + Math.random() * 3000)
+                    : 10000 + Math.random() * 8000;
+                const timer = setTimeout(() => {
+                    if (catFrame.dataset.motion === 'idle') {
+                        catFrame.dataset.motion = kind;
+                        catMotionResetTimer = setTimeout(() => { catFrame.dataset.motion = 'idle'; }, kind === 'blink' ? 160 : 260);
+                    }
+                    schedule(kind);
+                }, delay);
+                if (kind === 'blink') catBlinkTimer = timer;
+                else catEarTimer = timer;
+            }
+            schedule('blink', true);
+            schedule('ear');
+        }
+        document.addEventListener('visibilitychange', startCatMotions);
+        catMotionPreference.addEventListener('change', startCatMotions);
+
         function setCatState(nextState, caption) {
+            stopCatMotions();
             clearTimeout(catTransitionTimer);
             catScene.dataset.state = nextState;
             catCaption.textContent = caption;
@@ -452,6 +500,7 @@
             if (duration) {
                 catTransitionTimer = setTimeout(() => {
                     catScene.dataset.state = nextState === 'entering' ? 'resting' : 'away';
+                    if (nextState === 'entering') startCatMotions();
                 }, duration);
             }
         }
