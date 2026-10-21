@@ -74,6 +74,28 @@
         .cat-scene[data-state="startled"] .cat-actor { animation: cat-flee 1s ease-in forwards; }
         .cat-scene[data-state="goodbye"] .cat-actor { animation: cat-goodbye 1.8s ease-in-out forwards; }
         .cat-caption { margin: 0; color: #9a8c7e; font-size: 12px; line-height: 20px; }
+        .nest-decoration { position: absolute; pointer-events: none; bottom: 16%; width: 48px; height: 48px; }
+        .nest-decoration[hidden] { display: none; }
+        .nest-yarn { left: 2%; transform: rotate(-12deg); }
+        .nest-plant { right: 1%; width: 55px; height: 75px; bottom: 19%; }
+        .cat-stage.has-cushion .cat-cushion { filter: sepia(.45) saturate(1.8) hue-rotate(295deg); }
+        .reward-panel { background: #fffdf9; border: 1px solid #eee5d9; border-radius: 24px; padding: 22px; margin-bottom: 24px; }
+        .reward-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .reward-heading h2 { font-size: 15px; font-weight: 700; color: #65513f; }
+        .fish-balance { font-size: 13px; color: #755b39; white-space: nowrap; }
+        .reward-note { font-size: 12px; color: #8a7968; line-height: 1.8; margin-top: 10px; }
+        .reward-track { background: #eee8df; height: 5px; border-radius: 6px; overflow: hidden; margin-top: 12px; }
+        .reward-fill { background: #b78b5d; height: 100%; width: 0; }
+        .reward-items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+        .reward-item { border: 1px solid #eee5d9; border-radius: 14px; padding: 12px 5px; text-align: center; background: white; }
+        .reward-icon { font-size: 27px; display: block; margin-bottom: 7px; }
+        .reward-name { font-size: 12px; font-weight: 600; color: #65513f; }
+        .reward-price { font-size: 10px; color: #8a7968; margin: 5px 0 10px; }
+        .reward-action { font-size: 12px; font-weight: 600; color: #77532e; min-height: 32px; padding: 4px; border-radius: 6px; }
+        .reward-action:disabled { color: #a89c8f; cursor: default; }
+        .reward-action:focus-visible { outline: 2px solid #b78b5d; outline-offset: 2px; }
+        .reward-message { font-size: 12px; line-height: 1.8; color: #78592f; margin-top: 12px; }
+        .reward-message:empty { display: none; }
         @keyframes cat-enter { from { opacity: 0; transform: translateX(-170px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes cat-breathe { 50% { transform: scaleY(1.035); } }
         @keyframes cat-flee { 0% { opacity: 1; transform: translateY(0); } 25% { opacity: 1; transform: translateY(-7px); } 100% { opacity: 0; transform: translateX(210px); } }
@@ -86,15 +108,6 @@
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col items-center p-6">
 
     <div class="w-full max-w-md flex-1 flex flex-col">
-        <!-- Header -->
-        <header class="text-center mt-3 mb-6">
-            <div class="flex items-center justify-center gap-2 mb-1">
-                <img src="favicon.png" class="w-6 h-6" alt="logo">
-                <h1 class="text-xl font-semibold tracking-tight">Silent Time</h1>
-            </div>
-            <p class="text-gray-500 text-xs">保护你的安静时间</p>
-        </header>
-
         <!-- Main Timer Card -->
         <main class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 mb-8 text-center border border-gray-100 flex-1 flex flex-col justify-center relative">
             
@@ -118,6 +131,8 @@
                         <img class="cat-detail cat-blink-right" src="assets/images/cat-blink.png" alt="" draggable="false">
                         <img class="cat-detail cat-ear-frame" src="assets/images/cat-ear.png" alt="" draggable="false">
                     </div></div></div>
+                    <svg id="nest-yarn" class="nest-decoration nest-yarn" viewBox="0 0 60 60" hidden aria-hidden="true"><path d="M33 48 Q49 58 56 45" fill="none" stroke="#bd7b66" stroke-width="2.5"/><circle cx="26" cy="31" r="20" fill="#dca58f" stroke="#bd7b66" stroke-width="2"/><g fill="none" stroke="#f5d8c5" stroke-width="2"><path d="M9 21 Q31 24 40 45 M8 29 Q26 30 35 49 M14 15 Q36 18 45 35 M18 12 Q10 32 24 50 M29 11 Q20 31 37 47"/></g></svg>
+                    <svg id="nest-plant" class="nest-decoration nest-plant" viewBox="0 0 60 85" hidden aria-hidden="true"><g fill="none" stroke="#658168" stroke-width="3" stroke-linecap="round"><path d="M30 57 V18 M30 40 L16 28 M30 33 L44 20"/></g><g fill="#8ca784"><ellipse cx="16" cy="26" rx="7" ry="12" transform="rotate(-40 16 26)"/><ellipse cx="43" cy="20" rx="7" ry="12" transform="rotate(40 43 20)"/><ellipse cx="30" cy="15" rx="6" ry="11"/></g><path d="M14 52 H46 L41 78 Q30 83 19 78 Z" fill="#c99677"/><path d="M12 51 H48 V58 H12 Z" fill="#dfb394"/></svg>
                 </div>
                 <p id="cat-caption" class="cat-caption" role="status" aria-live="polite">留一段安静，等猫咪来</p>
             </div>
@@ -158,6 +173,16 @@
             </div>
         </main>
 
+        <section class="reward-panel" aria-labelledby="reward-title">
+            <div class="reward-heading"><h2 id="reward-title">猫咪的小窝</h2><span class="fish-balance">小鱼 <strong id="fish-balance">0</strong> 条</span></div>
+            <p id="reward-next" class="reward-note"></p>
+            <div class="reward-track" role="progressbar" aria-label="下一条小鱼进度" aria-valuemin="0" aria-valuemax="300" aria-valuenow="0" id="fish-progress"><div id="fish-progress-fill" class="reward-fill"></div></div>
+            <p id="fish-next" class="reward-note"></p>
+            <div id="reward-items" class="reward-items"></div>
+            <p id="reward-message" class="reward-message" role="status" aria-live="polite"></p>
+            <p class="reward-note">每累计专注满 5 分钟，小鱼立即到账，不足部分留到下次。专注期间也可以兑换和调整布置。小鱼与装饰保存在当前浏览器。</p>
+        </section>
+
         <!-- Stats Section -->
         <section class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
             <div class="flex justify-between items-end mb-4">
@@ -186,9 +211,8 @@
 
         <!-- Footer -->
         <footer class="text-center pb-8 mt-auto">
-            <p class="text-[10px] text-gray-300 uppercase tracking-widest font-medium">
-                Pure Static • Precision Mode
-            </p>
+            <p class="text-xs text-gray-400 font-medium">Silent Time</p>
+            <p class="text-[10px] text-gray-400 mt-1">保护你的安静时间</p>
         </footer>
     </div>
 
@@ -270,6 +294,114 @@
             sessions: JSON.parse(localStorage.getItem('silent_sessions') || '[]'),
             timerRequest: null
         };
+
+        // 恢复上次已到账时保存的专注片段，避免关闭页面后奖励丢失。
+        try {
+            const checkpoint = JSON.parse(localStorage.getItem('silent_focus_checkpoint') || 'null');
+            if (checkpoint && Number.isFinite(checkpoint.start) && Number.isFinite(checkpoint.end)
+                && Number.isFinite(checkpoint.duration) && checkpoint.duration > 0) {
+                if (!state.sessions.some(session => session.start === checkpoint.start)) {
+                    state.sessions.push(checkpoint);
+                    localStorage.setItem('silent_sessions', JSON.stringify(state.sessions));
+                }
+                localStorage.removeItem('silent_focus_checkpoint');
+            }
+        } catch (e) {}
+        let lastNestSecond = -1;
+        let displayedFishEarned = 0;
+        const nestItems = [
+            { id: 'yarn', name: '毛线球', icon: '🧶', price: 2 },
+            { id: 'plant', name: '小盆栽', icon: '🪴', price: 6 },
+            { id: 'cushion', name: '暖粉垫子', icon: '🛏️', price: 12 }
+        ];
+        let nest = { owned: [], equipped: [] };
+        try {
+            const saved = JSON.parse(localStorage.getItem('silent_nest') || 'null');
+            if (saved && Array.isArray(saved.owned) && Array.isArray(saved.equipped)) {
+                nest.owned = nestItems.filter(item => saved.owned.includes(item.id)).map(item => item.id);
+                nest.equipped = nest.owned.filter(id => saved.equipped.includes(id));
+            }
+        } catch (e) {}
+
+        function savedFocusSeconds() {
+            return state.sessions.reduce((sum, session) => sum + (Number.isFinite(session.duration) ? Math.max(0, session.duration) : 0), 0);
+        }
+        function totalRewardSeconds() {
+            return savedFocusSeconds() + (state.isFocusing ? Math.max(0, Math.floor((Date.now() - state.startTime) / 1000)) : 0);
+        }
+        function checkpointFocus() {
+            if (!state.isFocusing) return;
+            const duration = Math.max(0, Math.floor((Date.now() - state.startTime) / 1000));
+            localStorage.setItem('silent_focus_checkpoint', JSON.stringify({
+                start: state.startTime, end: state.startTime + duration * 1000, duration
+            }));
+        }
+        function updateLiveRewards() {
+            const seconds = totalRewardSeconds();
+            if (seconds === lastNestSecond) return;
+            lastNestSecond = seconds;
+            const earned = Math.floor(seconds / 300);
+            if (earned > displayedFishEarned) {
+                checkpointFocus();
+                document.getElementById('reward-message').textContent = `获得 ${earned - displayedFishEarned} 条小鱼，已到账，现在就可以兑换。`;
+            }
+            displayedFishEarned = earned;
+            renderNest();
+        }
+        function nestBalance() {
+            const spent = nestItems.reduce((sum, item) => sum + (nest.owned.includes(item.id) ? item.price : 0), 0);
+            return Math.max(0, Math.floor(totalRewardSeconds() / 300) - spent);
+        }
+        function renderNest() {
+            const balance = nestBalance();
+            const seconds = totalRewardSeconds() % 300;
+            document.getElementById('fish-balance').textContent = balance;
+            document.getElementById('fish-progress').setAttribute('aria-valuenow', seconds);
+            document.getElementById('fish-progress-fill').style.width = `${seconds / 3}%`;
+            const remaining = 300 - seconds;
+            document.getElementById('fish-next').textContent = `再积累 ${Math.floor(remaining / 60)} 分 ${remaining % 60} 秒，获得下一条小鱼 · 满 5 分钟立即到账`;
+            const next = nestItems.find(item => !nest.owned.includes(item.id));
+            const needed = next ? Math.max(0, next.price * 300 - balance * 300 - seconds) : 0;
+            document.getElementById('reward-next').textContent = next
+                ? balance >= next.price ? `可以给猫咪添一个${next.name}了。`
+                    : `再专注约 ${Math.ceil(needed / 60)} 分钟，就能兑换${next.name}。`
+                : '小窝已经布置齐了，继续和猫咪积攒安静的时光。';
+            document.getElementById('reward-items').innerHTML = nestItems.map(item => {
+                const owned = nest.owned.includes(item.id);
+                const equipped = nest.equipped.includes(item.id);
+                return `<div class="reward-item"><span class="reward-icon" aria-hidden="true">${item.icon}</span><p class="reward-name">${item.name}</p><p class="reward-price">${owned ? '已拥有 · 永久保留' : `${item.price} 条小鱼`}</p><button class="reward-action" data-nest-item="${item.id}" aria-label="${owned ? equipped ? '收起' : '摆放' : '兑换'}${item.name}" ${!owned && balance < item.price ? 'disabled' : ''}>${owned ? equipped ? '收起' : '摆放' : balance >= item.price ? '兑换并摆放' : '攒小鱼中'}</button></div>`;
+            }).join('');
+            document.getElementById('nest-yarn').toggleAttribute('hidden', !nest.equipped.includes('yarn'));
+            document.getElementById('nest-plant').toggleAttribute('hidden', !nest.equipped.includes('plant'));
+            document.querySelector('.cat-stage').classList.toggle('has-cushion', nest.equipped.includes('cushion'));
+        }
+        document.getElementById('reward-items').addEventListener('click', event => {
+            const button = event.target.closest('[data-nest-item]');
+            if (!button) return;
+            const item = nestItems.find(item => item.id === button.dataset.nestItem);
+            if (!item) return;
+            const nextNest = { owned: [...nest.owned], equipped: [...nest.equipped] };
+            const buying = !nextNest.owned.includes(item.id);
+            if (buying) {
+                if (nestBalance() < item.price) return;
+                nextNest.owned.push(item.id);
+                nextNest.equipped.push(item.id);
+            } else {
+                nextNest.equipped = nextNest.equipped.includes(item.id)
+                    ? nextNest.equipped.filter(id => id !== item.id) : [...nextNest.equipped, item.id];
+            }
+            try { checkpointFocus(); localStorage.setItem('silent_nest', JSON.stringify(nextNest)); }
+            catch (e) {
+                document.getElementById('reward-message').textContent = '暂时无法保存布置，请检查浏览器存储后重试，小鱼未扣除。';
+                return;
+            }
+            nest = nextNest;
+            renderNest();
+            document.getElementById('reward-message').textContent = buying
+                ? `花费 ${item.price} 条小鱼，${item.name}已经放进小窝！`
+                : `${item.name}已${nest.equipped.includes(item.id) ? '摆放' : '收起'}。`;
+            document.querySelector(`[data-nest-item="${item.id}"]`).focus();
+        });
 
         // ── Supabase 埋点 ──────────────────────────────────────────
         let supabaseClient = null;
@@ -559,6 +691,7 @@
 
             // 实时更新今日累计
             updateTotalDisplay(state.currentSessionMs);
+            updateLiveRewards();
 
             if (state.currentSessionMs < 5000) {
                 hintText.textContent = "保持绝对静止，深度进入...";
@@ -571,6 +704,7 @@
         }
 
         function saveSession() {
+            const previousEarned = Math.floor(savedFocusSeconds() / 300);
             if (state.currentSessionMs > 1000) {
                 state.sessions.push({
                     start: state.startTime,
@@ -578,7 +712,14 @@
                     duration: Math.floor(state.currentSessionMs / 1000)
                 });
                 localStorage.setItem('silent_sessions', JSON.stringify(state.sessions));
+                localStorage.removeItem('silent_focus_checkpoint');
                 renderStats();
+                const earned = Math.floor(savedFocusSeconds() / 300) - previousEarned;
+                displayedFishEarned = Math.floor(savedFocusSeconds() / 300);
+                renderNest();
+                document.getElementById('reward-message').textContent = earned > 0
+                    ? `本次共获得 ${earned} 条小鱼，已计入余额。看看能给猫咪添些什么？`
+                    : '这段专注已积累，距离下一条小鱼又近了一点。';
             }
         }
 
@@ -611,6 +752,10 @@
             state.isFocusing = true;
             state.startTime = Date.now();
             state.currentSessionMs = 0;
+            lastNestSecond = -1;
+            displayedFishEarned = Math.floor(savedFocusSeconds() / 300);
+            document.getElementById('reward-message').textContent = '';
+            renderNest();
             updateNowPlaying();
 
             track('focus_start', { start_time: state.startTime });
@@ -741,6 +886,7 @@
         window.addEventListener('beforeunload', () => {
             if (state.isFocusing) {
                 state.currentSessionMs = Date.now() - state.startTime;
+                state.isFocusing = false;
                 saveSession();
             }
         });
@@ -869,6 +1015,7 @@
         // ──────────────────────────────────────────────────────────
 
         renderStats();
+        renderNest();
     </script>
 </body>
 </html>
