@@ -25,21 +25,6 @@
             text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
         }
 
-        @keyframes shine-reverse {
-            0% { background-position: 200% center; }
-            100% { background-position: -200% center; }
-        }
-
-        .progress-shimmer {
-            background: linear-gradient(
-                -90deg, 
-                #3b82f6 0%, 
-                #93c5fd 50%, 
-                #3b82f6 100%
-            );
-            background-size: 200% auto;
-            animation: shine-reverse 2.5s linear infinite;
-        }
 
         .timeline-block {
             position: absolute;
@@ -49,15 +34,11 @@
             border-radius: 2px;
         }
 
-        /* 移除 transition，防止满一分钟时产生回退动画 */
-        #micro-progress {
-            transition: none; 
-        }
 
         .cat-scene { min-height: 185px; position: relative; overflow: hidden; margin: -12px 0 12px; }
-        .cat-stage { width: 320px; max-width: 100%; aspect-ratio: 250 / 160; position: relative; margin: auto; }
-        .cat-cushion { position: absolute; width: 100%; max-width: 100%; height: auto; bottom: -5%; left: 50%; transform: translateX(-50%); user-select: none; }
-        .cat-stage .cat-actor { position: absolute; width: 76%; aspect-ratio: 1536 / 1024; bottom: 20.625%; left: 12%; }
+        .cat-stage { isolation: isolate; width: 320px; max-width: 100%; aspect-ratio: 320 / 270; position: relative; margin: auto; }
+        .cat-cushion { position: absolute; width: 74%; max-width: 100%; height: auto; bottom: -1%; left: 60%; transform: translateX(-50%); user-select: none; }
+        .cat-stage .cat-actor { position: absolute; width: 56.24%; aspect-ratio: 1536 / 1024; bottom: 13.4%; left: 31.88%; }
         .cat-body { display: block; width: 100%; height: 100%; object-fit: contain; transform-origin: center 86%; user-select: none; }
         .cat-frame { position: relative; width: 100%; height: 100%; }
         .cat-detail { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; pointer-events: none; }
@@ -74,10 +55,15 @@
         .cat-scene[data-state="startled"] .cat-actor { animation: cat-flee 1s ease-in forwards; }
         .cat-scene[data-state="goodbye"] .cat-actor { animation: cat-goodbye 1.8s ease-in-out forwards; }
         .cat-caption { margin: 0; color: #9a8c7e; font-size: 12px; line-height: 20px; }
+        .nest-room-item { position: absolute; pointer-events: none; }
+        .nest-room-item[hidden] { display: none; }
+        .nest-window { z-index: -3; width: 100%; height: 100%; inset: 0; }
+        .nest-rug { z-index: -1; width: 100%; height: 35%; bottom: 1%; left: 0; }
+        .nest-lamp { z-index: -2; width: 30%; height: 76%; left: 0; bottom: 17%; }
         .nest-decoration { position: absolute; pointer-events: none; bottom: 16%; width: 48px; height: 48px; }
         .nest-decoration[hidden] { display: none; }
-        .nest-yarn { left: 2%; transform: rotate(-12deg); }
-        .nest-plant { right: 1%; width: 55px; height: 75px; bottom: 19%; }
+        .nest-yarn { left: 18%; transform: rotate(-12deg); }
+        .nest-plant { right: 0; width: 48px; height: 66px; bottom: 10%; }
         .cat-stage.has-cushion .cat-cushion { filter: sepia(.45) saturate(1.8) hue-rotate(295deg); }
         .reward-panel { background: #fffdf9; border: 1px solid #eee5d9; border-radius: 24px; padding: 22px; margin-bottom: 24px; }
         .reward-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -111,10 +97,6 @@
         <!-- Main Timer Card -->
         <main class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 mb-8 text-center border border-gray-100 flex-1 flex flex-col justify-center relative">
             
-            <div id="status-tag" class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 mb-8 uppercase tracking-widest transition-all">
-                准备就绪
-            </div>
-
             <!-- 今日累计 — 主视觉 -->
             <div class="mb-8">
                 <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">今日累计</p>
@@ -124,6 +106,33 @@
             <!-- 猫咪陪伴：音频成功播放才进场，离开后保留空垫子 -->
             <div id="cat-scene" class="cat-scene" data-state="waiting">
                 <div class="cat-stage" aria-hidden="true">
+                    <svg id="nest-window" class="nest-room-item nest-window" viewBox="0 0 320 205" preserveAspectRatio="none" hidden aria-hidden="true">
+                        <defs><linearGradient id="window-sky" x2="0" y2="1"><stop stop-color="#c9dce0"/><stop offset="1" stop-color="#f9e9cb"/></linearGradient></defs>
+                        <rect x="2" y="2" width="316" height="201" rx="20" fill="#f8f2e8"/>
+                        <rect x="175" y="12" width="109" height="108" rx="7" fill="#bc9575"/>
+                        <rect x="181" y="18" width="97" height="96" rx="3" fill="url(#window-sky)"/>
+                        <circle cx="252" cy="39" r="12" fill="#fff6db"/>
+                        <path d="M181 98 Q205 73 229 98 Q252 78 278 94 V114 H181Z" fill="#a8b7a0"/>
+                        <path d="M230 18V114 M181 66H278" stroke="#bc9575" stroke-width="5"/>
+                        <path d="M168 17 Q181 51 170 98 L185 98 Q195 51 185 17 M274 17 Q263 52 275 98 L291 98 Q279 52 290 17" fill="#dfc9af"/>
+                        <rect x="170" y="116" width="120" height="6" rx="3" fill="#ae886c"/>
+                        <path d="M3 154 H317" stroke="#e9dfd0" stroke-width="2"/>
+                    </svg>
+                    <svg id="nest-rug" class="nest-room-item nest-rug" viewBox="0 0 320 80" hidden aria-hidden="true">
+                        <ellipse cx="160" cy="41" rx="153" ry="35" fill="#c7b198" stroke="#a98e74" stroke-width="2"/>
+                        <ellipse cx="160" cy="41" rx="141" ry="27" fill="none" stroke="#efe0c9" stroke-width="3"/>
+                        <path d="M61 41L77 32L93 41L77 50Z M226 41L242 32L258 41L242 50Z" fill="#efe0c9"/>
+                        <path d="M111 64Q160 72 209 64" fill="none" stroke="#efe0c9" stroke-width="2"/>
+                    </svg>
+                    <svg id="nest-lamp" class="nest-room-item nest-lamp" viewBox="0 0 90 150" hidden aria-hidden="true">
+                        <defs><radialGradient id="lamp-glow"><stop stop-color="#ffdf8e" stop-opacity=".5"/><stop offset="1" stop-color="#ffdf8e" stop-opacity="0"/></radialGradient></defs>
+                        <ellipse cx="46" cy="79" rx="44" ry="65" fill="url(#lamp-glow)"/>
+                        <path d="M46 56V134" stroke="#997550" stroke-width="5"/>
+                        <ellipse cx="46" cy="137" rx="23" ry="5" fill="#ad8760"/>
+                        <path d="M26 17H66L79 59Q46 70 13 59Z" fill="#edd2a1" stroke="#b8976b" stroke-width="2"/>
+                        <ellipse cx="46" cy="59" rx="32" ry="7" fill="#ffebbb"/>
+                        <path d="M36 20L30 53 M55 20L62 53" stroke="#f9e6c3" stroke-width="2"/>
+                    </svg>
                     <img class="cat-cushion" src="assets/images/cat-cushion.png" alt="" width="1536" height="1024" decoding="async" draggable="false">
                     <div class="cat-actor"><div class="cat-body"><div id="cat-frame" class="cat-frame" data-motion="idle">
                         <img class="cat-detail cat-base" style="position:relative;opacity:1" src="assets/images/awake-cat.png" alt="" width="1536" height="1024" draggable="false">
@@ -143,11 +152,10 @@
             <!-- 当前专注 -->
             <div class="mb-6">
                 <p class="text-[10px] font-semibold text-gray-300 uppercase tracking-widest mb-2">当前专注</p>
-                <!-- 独立进度条 -->
-                <div id="progress-wrapper" class="w-full mb-3 opacity-0 transition-opacity duration-500">
-                    <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div id="micro-progress" class="h-full w-0 rounded-full progress-shimmer"></div>
-                    </div>
+                <!-- 小鱼积累进度：跨次累计，满五分钟立即到账 -->
+                <div class="w-full mb-4">
+                    <div class="reward-track" role="progressbar" aria-label="下一条小鱼进度" aria-valuemin="0" aria-valuemax="300" aria-valuenow="0" id="fish-progress"><div id="fish-progress-fill" class="reward-fill"></div></div>
+                    <p id="fish-next" class="reward-note"></p>
                 </div>
                 <!-- 计时器 -->
                 <div id="timer-display" class="text-2xl font-bold tabular-nums tracking-tighter timer-font timer-glow text-gray-400">
@@ -176,8 +184,6 @@
         <section class="reward-panel" aria-labelledby="reward-title">
             <div class="reward-heading"><h2 id="reward-title">猫咪的小窝</h2><span class="fish-balance">小鱼 <strong id="fish-balance">0</strong> 条</span></div>
             <p id="reward-next" class="reward-note"></p>
-            <div class="reward-track" role="progressbar" aria-label="下一条小鱼进度" aria-valuemin="0" aria-valuemax="300" aria-valuenow="0" id="fish-progress"><div id="fish-progress-fill" class="reward-fill"></div></div>
-            <p id="fish-next" class="reward-note"></p>
             <div id="reward-items" class="reward-items"></div>
             <p id="reward-message" class="reward-message" role="status" aria-live="polite"></p>
             <p class="reward-note">每累计专注满 5 分钟，小鱼立即到账，不足部分留到下次。专注期间也可以兑换和调整布置。小鱼与装饰保存在当前浏览器。</p>
@@ -312,7 +318,10 @@
         const nestItems = [
             { id: 'yarn', name: '毛线球', icon: '🧶', price: 2 },
             { id: 'plant', name: '小盆栽', icon: '🪴', price: 6 },
-            { id: 'cushion', name: '暖粉垫子', icon: '🛏️', price: 12 }
+            { id: 'cushion', name: '暖粉垫子', icon: '🛏️', price: 12 },
+            { id: 'lamp', name: '暖光台灯', icon: '💡', price: 18 },
+            { id: 'rug', name: '编织地毯', icon: '🧵', price: 24 },
+            { id: 'window', name: '窗边背景', icon: '🪟', price: 36 }
         ];
         let nest = { owned: [], equipped: [] };
         try {
@@ -359,7 +368,7 @@
             document.getElementById('fish-progress').setAttribute('aria-valuenow', seconds);
             document.getElementById('fish-progress-fill').style.width = `${seconds / 3}%`;
             const remaining = 300 - seconds;
-            document.getElementById('fish-next').textContent = `再积累 ${Math.floor(remaining / 60)} 分 ${remaining % 60} 秒，获得下一条小鱼 · 满 5 分钟立即到账`;
+            document.getElementById('fish-next').textContent = `再积累 ${Math.floor(remaining / 60)} 分 ${remaining % 60} 秒，获得 1 条小鱼`;
             const next = nestItems.find(item => !nest.owned.includes(item.id));
             const needed = next ? Math.max(0, next.price * 300 - balance * 300 - seconds) : 0;
             document.getElementById('reward-next').textContent = next
@@ -371,6 +380,9 @@
                 const equipped = nest.equipped.includes(item.id);
                 return `<div class="reward-item"><span class="reward-icon" aria-hidden="true">${item.icon}</span><p class="reward-name">${item.name}</p><p class="reward-price">${owned ? '已拥有 · 永久保留' : `${item.price} 条小鱼`}</p><button class="reward-action" data-nest-item="${item.id}" aria-label="${owned ? equipped ? '收起' : '摆放' : '兑换'}${item.name}" ${!owned && balance < item.price ? 'disabled' : ''}>${owned ? equipped ? '收起' : '摆放' : balance >= item.price ? '兑换并摆放' : '攒小鱼中'}</button></div>`;
             }).join('');
+            for (const id of ['lamp', 'rug', 'window']) {
+                document.getElementById(`nest-${id}`).toggleAttribute('hidden', !nest.equipped.includes(id));
+            }
             document.getElementById('nest-yarn').toggleAttribute('hidden', !nest.equipped.includes('yarn'));
             document.getElementById('nest-plant').toggleAttribute('hidden', !nest.equipped.includes('plant'));
             document.querySelector('.cat-stage').classList.toggle('has-cushion', nest.equipped.includes('cushion'));
@@ -577,13 +589,10 @@
         });
         const mainBtn = document.getElementById('main-btn');
         const timerDisplay = document.getElementById('timer-display');
-        const statusTag = document.getElementById('status-tag');
         const totalDisplay = document.getElementById('total-time');
         const hintText = document.getElementById('hint-text');
         const timelineContainer = document.getElementById('timeline-container');
         const sessionList = document.getElementById('session-list');
-        const microProgress = document.getElementById('micro-progress');
-        const progressWrapper = document.getElementById('progress-wrapper');
 
         const catScene = document.getElementById('cat-scene');
         const catCaption = document.getElementById('cat-caption');
@@ -684,10 +693,6 @@
             state.currentSessionMs = Date.now() - state.startTime;
             timerDisplay.innerHTML = formatTimeDetailed(state.currentSessionMs);
             
-            // 进度条计算
-            const progress = ((state.currentSessionMs % 60000) / 60000) * 100;
-            // 直接赋值宽度，不经过 CSS transition，从而实现无感 reset
-            microProgress.style.width = `${progress}%`;
 
             // 实时更新今日累计
             updateTotalDisplay(state.currentSessionMs);
@@ -743,8 +748,6 @@
                 mainBtn.textContent = "开始专注";
                 catCaption.textContent = previousCatCaption;
                 hintText.textContent = "声音启动失败，请检查网络或稍后重试";
-                statusTag.textContent = "声音未启动";
-                statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-600 mb-8 uppercase tracking-widest";
                 return;
             }
 
@@ -761,10 +764,7 @@
             track('focus_start', { start_time: state.startTime });
 
             document.body.classList.add('is-focusing');
-            progressWrapper.classList.replace('opacity-0', 'opacity-100');
             
-            statusTag.textContent = "深度专注中";
-            statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-blue-500 text-white mb-6 uppercase tracking-widest shadow-md";
             
             mainBtn.disabled = false;
             mainBtn.textContent = "结束本次专注";
@@ -790,20 +790,14 @@
             currentAudioIdx = 0;
             updateNowPlaying();
             
-            progressWrapper.classList.replace('opacity-100', 'opacity-0');
-            microProgress.style.width = '0';
 
             document.body.classList.remove('is-focusing');
             
             if (wasInterrupted) {
                 setCatState("startled", "声音打断了安静，猫咪离开了");
-                statusTag.textContent = "检测到干扰！";
-                statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-600 mb-6 uppercase tracking-widest";
                 hintText.textContent = "声音被抢占，专注已强制停止";
             } else {
                 setCatState("goodbye", `这次一起安静了 ${formatMinSec(Math.floor(state.currentSessionMs / 1000))}`);
-                statusTag.textContent = "专注已保存";
-                statusTag.className = "inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 mb-6 uppercase tracking-widest";
                 hintText.textContent = "准备好开始下一段纯净时间了吗？";
             }
 
